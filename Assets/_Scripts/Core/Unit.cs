@@ -1,5 +1,5 @@
 using UnityEngine;
-
+//local game script (to be merge into NetworkUnit.cs)
 public class Unit : MonoBehaviour
 {
     public UnitType Type { get; private set; }
