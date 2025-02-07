@@ -16,11 +16,31 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         serializer.SerializeValue(ref position);
     }
     [ServerRpc]
-    public void InitializeServerRpc(UnitType type, Vector2Int position) {
-        
-        //ToDo ***Ami** This Function to be add for NetworkGameManager.cs Line 29 ");
-        Debug.LogError("This Function to be add for NetworkGameManager.cs Line 29 ");
+    public void InitializeServerRpc(UnitType type, Vector2Int position)
+    {
+        // 1) Assign the type so GetInitialHP()/GetInitialAttackPower() knows which stats to use
+        Type = type;
+
+        // 2) Store the grid position in our NetworkVariable
+        gridPosition.Value = position;
+
+        // 3) Position the unit in the world
+        transform.position = GridManager.Instance.GetWorldPosition(position.x, position.y);
+
+        // 4) Mark the Cell's occupant so we know something is here
+        var cell = GridManager.Instance.GetCell(position.x, position.y);
+        if (cell != null)
+        {
+            cell.OccupyingUnit = this;
+        }
+
+        // (Optional) If you want to initialize HP/attack now instead of OnNetworkSpawn, you can do:
+        // currentHP.Value = GetInitialHP();
+        // attackPower.Value = GetInitialAttackPower();
+        // 
+        // But typically, it's fine to let OnNetworkSpawn() handle that on the server side.
     }
+
     public override void OnNetworkSpawn()
     {
         if (IsServer)
@@ -95,6 +115,15 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             case UnitType.Jeep: return 3;
             case UnitType.Soldier: return 1;
             default: return 0;
+        }
+    }
+    [ClientRpc]
+    public void RequestParentClientRpc(string parentName)
+    {
+        GameObject parentObject = GameObject.Find(parentName);
+        if (parentObject != null)
+        {
+            transform.SetParent(parentObject.transform);
         }
     }
 }
