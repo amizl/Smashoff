@@ -31,7 +31,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         var cell = GridManager.Instance.GetCell(position.x, position.y);
         if (cell != null)
         {
-            cell.OccupyingUnit = this;
+            cell.SetOccupyingUnit(this);
         }
 
         // (Optional) If you want to initialize HP/attack now instead of OnNetworkSpawn, you can do:

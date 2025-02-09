@@ -4,11 +4,22 @@ using UnityEngine;
 
 public class NetworkGameManager : NetworkBehaviour
 {
+   
     public static NetworkGameManager Instance { get; private set; }
     [SerializeField] private GameObject UnitsDirectory;
     
     [SerializeField] private GameObject[] unitPrefabs; // Tank, Jeep, Soldier prefabs with NetworkObject component
-    
+    private Vector2Int selectedCell = new Vector2Int(-1, -1); // Default: No cell selected
+
+    public void SetSelectedCell(int row, int col)
+    {
+        selectedCell = new Vector2Int(row, col);
+    }
+
+    public Vector2Int GetSelectedCell()
+    {
+        return selectedCell;
+    }
     private void Awake()
     {
         if (Instance == null)
@@ -33,7 +44,7 @@ public class NetworkGameManager : NetworkBehaviour
             return;
         }
 
-        // Instantiate unit
+        // Instantiate unit at selected cell position
         GameObject unit = Instantiate(unitPrefab, GridManager.Instance.GetWorldPosition(position.x, position.y), Quaternion.identity);
 
         // Get NetworkObject and spawn it
@@ -55,6 +66,7 @@ public class NetworkGameManager : NetworkBehaviour
 
         Debug.Log($"Spawned {type} at {position}, Parent: {unit.transform.parent}");
     }
+
 
     public void ExitGame()
     {

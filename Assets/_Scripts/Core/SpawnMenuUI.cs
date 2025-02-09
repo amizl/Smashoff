@@ -19,9 +19,16 @@ public class SpawnMenuUI : MonoBehaviour
     {
         if (NetworkManager.Singleton.IsServer)
         {
-            Vector2Int position = new Vector2Int(4, 7);
+            // Ensure a valid cell was selected
+            Vector2Int selectedCell = GridManager.Instance.GetSelectedCell();
+            if (selectedCell.x == -1 || selectedCell.y == -1)
+            {
+                Debug.LogError("No valid cell selected! Click a cell before spawning.");
+                return;
+            }
+
             ulong ownerClientId = NetworkManager.Singleton.LocalClientId;
-            NetworkGameManager.Instance.SpawnUnitServerRpc(type, position, ownerClientId);
+            NetworkGameManager.Instance.SpawnUnitServerRpc(type, selectedCell, ownerClientId);
         }
     }
 }
