@@ -118,12 +118,15 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         }
     }
     [ClientRpc]
-    public void RequestParentClientRpc(string parentName)
+    public void RequestParentClientRpc(string parentObjectName)
     {
-        GameObject parentObject = GameObject.Find(parentName);
-        if (parentObject != null)
+        if (!IsServer) return; // **Only the server can reparent**
+
+        Transform newParent = GameObject.Find(parentObjectName)?.transform;
+        if (newParent != null)
         {
-            transform.SetParent(parentObject.transform);
+            transform.SetParent(newParent);
         }
     }
+
 }

@@ -37,21 +37,38 @@ public class NetworkPlayer : NetworkBehaviour
     [ServerRpc]
     public void EndTurnServerRpc()
     {
-        if (isMyTurn.Value)
+        if (!isMyTurn.Value) return;
+
+        isMyTurn.Value = false;
+
+        NetworkPlayer nextPlayer = null;
+
+        // Find the next player and assign their turn
+        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            isMyTurn.Value = false;
-            // Find other player and set their turn to true
-            foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+            if (player != this)
             {
-                if (player != this)
-                {
-                    player.isMyTurn.Value = true;
-                    break;
-                }
+                nextPlayer = player;
+                break;
             }
-            AddResourcesServerRpc(2); // Add resources at turn start
         }
+
+        if (nextPlayer != null)
+        {
+            nextPlayer.isMyTurn.Value = true;
+            nextPlayer.AddResourcesServerRpc(2); // Give new player resources
+        }
+
+        // **NEW: Sync turn updates to all clients**
+        UpdateTurnClientRpc(nextPlayer != null ? nextPlayer.OwnerClientId : OwnerClientId);
     }
+
+    [ClientRpc]
+    private void UpdateTurnClientRpc(ulong newTurnClientId)
+    {
+        Debug.Log($"It is now Player {newTurnClientId}'s turn.");
+    }
+
 
     [ServerRpc]
     private void AddResourcesServerRpc(int amount)

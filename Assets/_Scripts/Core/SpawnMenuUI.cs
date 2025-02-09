@@ -17,18 +17,22 @@ public class SpawnMenuUI : MonoBehaviour
 
     private void SpawnUnit(UnitType type)
     {
-        if (NetworkManager.Singleton.IsServer)
+        // **NEW: Let all clients request spawn via ServerRpc**
+        Vector2Int selectedCell = GridManager.Instance.GetSelectedCell();
+        if (selectedCell.x == -1 || selectedCell.y == -1)
         {
-            // Ensure a valid cell was selected
-            Vector2Int selectedCell = GridManager.Instance.GetSelectedCell();
-            if (selectedCell.x == -1 || selectedCell.y == -1)
-            {
-                Debug.LogError("No valid cell selected! Click a cell before spawning.");
-                return;
-            }
-
-            ulong ownerClientId = NetworkManager.Singleton.LocalClientId;
-            NetworkGameManager.Instance.SpawnUnitServerRpc(type, selectedCell, ownerClientId);
+            Debug.LogError("No valid cell selected! Click a cell before spawning.");
+            return;
         }
+
+        ulong ownerClientId = NetworkManager.Singleton.LocalClientId;
+        RequestSpawnUnitServerRpc(type, selectedCell, ownerClientId);
     }
+
+    [ServerRpc]
+    private void RequestSpawnUnitServerRpc(UnitType type, Vector2Int cell, ulong clientId)
+    {
+        NetworkGameManager.Instance.SpawnUnitServerRpc(type, cell, clientId);
+    }
+
 }
