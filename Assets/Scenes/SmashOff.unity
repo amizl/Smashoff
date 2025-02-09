@@ -1302,6 +1302,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
+  ResourceText: {fileID: 408482237}
   TurnPlayTimer: {fileID: 524442390}
   spawnMenuUI: {fileID: 1182679454}
   playerIdentityText: {fileID: 1936607179}

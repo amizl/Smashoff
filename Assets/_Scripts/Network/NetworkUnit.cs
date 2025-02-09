@@ -3,11 +3,18 @@ using UnityEngine;
 
 public class NetworkUnit : NetworkBehaviour, INetworkSerializable
 {
+    public UnitType Type { get; private set; }
+    public int MaxHP { get; private set; }
+    public int CurrentHP { get; private set; }
+    public int AttackPower { get; private set; }
+    public int Cost { get; private set; }
+    public Player Owner { get; private set; }
+
     private NetworkVariable<int> currentHP = new NetworkVariable<int>();
     private NetworkVariable<int> attackPower = new NetworkVariable<int>();
     private NetworkVariable<Vector2Int> gridPosition = new NetworkVariable<Vector2Int>();
     
-    public UnitType Type { get; private set; }
+   
     public int unitID;
     public Vector3 position;
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -15,30 +22,47 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         serializer.SerializeValue(ref unitID);
         serializer.SerializeValue(ref position);
     }
+    
     [ServerRpc(RequireOwnership = false)]
-    public void InitializeServerRpc(UnitType type, Vector2Int position)
+    public void InitializeServerRpc(UnitType type, Vector2Int position, ulong ownerId)
     {
-        // 1) Assign the type so GetInitialHP()/GetInitialAttackPower() knows which stats to use
         Type = type;
+        Owner = (ownerId == 0) ? Player.Player1 : Player.Player2; // Assign the player
 
-        // 2) Store the grid position in our NetworkVariable
+        // Set unit stats
+        switch (type)
+        {
+            case UnitType.Tank:
+                MaxHP = 10;
+                AttackPower = 5;
+                Cost = 4;
+                break;
+            case UnitType.Jeep:
+                MaxHP = 6;
+                AttackPower = 3;
+                Cost = 2;
+                break;
+            case UnitType.Soldier:
+                MaxHP = 3;
+                AttackPower = 1;
+                Cost = 1;
+                break;
+        }
+        CurrentHP = MaxHP;
+
+        // Deduct resources when spawning the unit
+        ResourceManager.Instance.SpendResources(Owner, Cost);
+
+        // Store grid position and place unit in the world
         gridPosition.Value = position;
-
-        // 3) Position the unit in the world
         transform.position = GridManager.Instance.GetWorldPosition(position.x, position.y);
 
-        // 4) Mark the Cell's occupant so we know something is here
+        // Mark the cell as occupied
         var cell = GridManager.Instance.GetCell(position.x, position.y);
         if (cell != null)
         {
             cell.SetOccupyingUnit(this);
         }
-
-        // (Optional) If you want to initialize HP/attack now instead of OnNetworkSpawn, you can do:
-        // currentHP.Value = GetInitialHP();
-        // attackPower.Value = GetInitialAttackPower();
-        // 
-        // But typically, it's fine to let OnNetworkSpawn() handle that on the server side.
     }
 
     public override void OnNetworkSpawn()

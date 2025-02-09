@@ -4,9 +4,12 @@ using TMPro;
 using UnityEngine.UI;
 using Unity.Netcode;
 using Unity.Services.Qos.V2.Models;
+using System.Resources;
 
 public class TurnManager : NetworkBehaviour
 {
+    [SerializeField] private TextMeshProUGUI ResourceText;
+
     [SerializeField] private TextMeshProUGUI TurnPlayTimer;
     [SerializeField] private SpawnMenuUI spawnMenuUI;
     [SerializeField] private TextMeshProUGUI playerIdentityText;
@@ -94,12 +97,16 @@ public class TurnManager : NetworkBehaviour
         CurrentPlayer = (CurrentPlayer == Player.Player1) ? Player.Player2 : Player.Player1;
         turnTimer = TurnTimeLimit; // Reset timer for new turn
 
+        //  Ensure only the server adds resources
+        ResourceManager.Instance.AddResourcesServerRpc(CurrentPlayer, 2);
+
+        // Debug log for testing
+        Debug.Log($"[TurnManager] Turn switched. Current Player: {CurrentPlayer}");
+
         // Sync turn change across all clients
         UpdateTurnClientRpc(CurrentPlayer);
-
-        // Add resources at the start of the turn
-        ResourceManager.Instance.AddResources(CurrentPlayer, 2);
     }
+
 
 
     [ClientRpc]
@@ -112,13 +119,26 @@ public class TurnManager : NetworkBehaviour
             turnText.text = $"Turn: {CurrentPlayer}";
 
         UpdateEndTurnButton();
+        // **NEW: Refresh Resource UI**
+        UpdateResourceUI();
+    }
+    private void UpdateResourceUI()
+    {
+        if (ResourceManager.Instance != null && ResourceText != null)
+        {
+            int playerResources = ResourceManager.Instance.GetResources(CurrentPlayer);
+            ResourceText.text = $"Resources: {playerResources}";
+        }
     }
 
 
     [ServerRpc(RequireOwnership = false)]
     public void EndTurnServerRpc()
     {
-        EndTurn();
+        if (IsServer) // Ensures only the server processes turn logic
+        {
+            EndTurn();
+        }
     }
 
 

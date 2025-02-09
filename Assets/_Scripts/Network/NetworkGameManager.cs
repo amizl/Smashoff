@@ -62,7 +62,9 @@ public class NetworkGameManager : NetworkBehaviour
 
         // Initialize unit on server
         NetworkUnit networkUnit = unit.GetComponent<NetworkUnit>();
-        networkUnit.InitializeServerRpc(type, position);
+        networkUnit.InitializeServerRpc(type, position, ownerClientId);
+
+
 
         Debug.Log($"Spawned {type} at {position}, Parent: {unit.transform.parent}");
     }
