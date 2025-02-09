@@ -4,6 +4,7 @@ using Unity.Netcode;
 
 public class SpawnMenuUI : MonoBehaviour
 {
+    [SerializeField] private SpawnMenuUI spawnMenuUI;
     [SerializeField] private Button spawnTankButton;
     [SerializeField] private Button spawnJeepButton;
     [SerializeField] private Button spawnSoldierButton;
@@ -34,5 +35,10 @@ public class SpawnMenuUI : MonoBehaviour
     {
         NetworkGameManager.Instance.SpawnUnitServerRpc(type, cell, clientId);
     }
-
+    public void SetSpawnButtonsInteractable(bool state)
+    {
+        spawnTankButton.interactable = state;
+        spawnJeepButton.interactable = state;
+        spawnSoldierButton.interactable = state;
+    }
 }

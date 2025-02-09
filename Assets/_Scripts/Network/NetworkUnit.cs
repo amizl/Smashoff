@@ -15,7 +15,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         serializer.SerializeValue(ref unitID);
         serializer.SerializeValue(ref position);
     }
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)]
     public void InitializeServerRpc(UnitType type, Vector2Int position)
     {
         // 1) Assign the type so GetInitialHP()/GetInitialAttackPower() knows which stats to use
