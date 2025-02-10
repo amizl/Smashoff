@@ -30,14 +30,56 @@ public class ResourceManager : NetworkBehaviour
         return resources[player].Value;
     }
 
+
     [ServerRpc(RequireOwnership = false)]
     public void AddResourcesServerRpc(Player player, int amount)
     {
-        if (!IsServer) return; // Only the server modifies resources
+        if (!IsServer) return;
 
-        resources[player].Value += amount;
-        Debug.Log($"[ResourceManager] {player} gained {amount} resources. New total: {resources[player].Value}");
+        if (resources.ContainsKey(player))
+        {
+            resources[player].Value += amount;
+            Debug.Log($"[ResourceManager] {player} gained {amount} resources. New total: {resources[player].Value}");
+
+            // *** Broadcast to *all* clients now. ***
+            UpdateResourceForPlayerClientRpc(resources[player].Value, player);
+        }
     }
+
+    [ClientRpc]
+    private void UpdateResourceForPlayerClientRpc(int newResourceAmount, Player updatedPlayer)
+    {
+        // Figure out which player *I* am (Host == Player1, Client == Player2)
+        Player localPlayer = (NetworkManager.Singleton.LocalClientId == 0)
+            ? Player.Player1
+            : Player.Player2;
+
+        // If this update is for me, update my UI.
+        if (localPlayer == updatedPlayer)
+        {
+            TurnManager.Instance.UpdateResourceUI(newResourceAmount);
+        }
+    }
+
+    private ulong GetClientIdForPlayer(Player player)
+    {
+        return (ulong)(player == Player.Player1 ? 0 : 1); // Cast int to ulong
+    }
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // Only the server sets up initial values
+        if (IsServer)
+        {
+            // Each player starts with 5 resources, for example
+            resources[Player.Player1].Value = 5;
+            resources[Player.Player2].Value = 5;
+        }
+    }
+
+
+
 
     public bool SpendResources(Player player, int amount)
     {
@@ -46,6 +88,7 @@ public class ResourceManager : NetworkBehaviour
         if (resources[player].Value >= amount)
         {
             resources[player].Value -= amount;
+            Debug.Log($"[ResourceManager] {player} spent {amount} resources. Remaining: {resources[player].Value}");
             return true;
         }
         return false;
