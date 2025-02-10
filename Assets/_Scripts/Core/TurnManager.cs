@@ -122,7 +122,7 @@ public class TurnManager : NetworkBehaviour
         // **NEW: Refresh Resource UI**
         UpdateResourceUI();
     }
-    private void UpdateResourceUI()
+    public void UpdateResourceUI()
     {
         if (ResourceManager.Instance != null && ResourceText != null)
         {

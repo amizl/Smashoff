@@ -57,7 +57,7 @@ public class ResourceManager : NetworkBehaviour
         // If this update is for me, update my UI.
         if (localPlayer == updatedPlayer)
         {
-            TurnManager.Instance.UpdateResourceUI(newResourceAmount);
+            TurnManager.Instance.UpdateResourceUI();
         }
     }
 
