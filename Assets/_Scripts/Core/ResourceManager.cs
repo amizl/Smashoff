@@ -5,9 +5,9 @@ public class ResourceManager : NetworkBehaviour
 {
     public static ResourceManager Instance { get; private set; }
 
-    // Instead of a dictionary, use two dedicated NetworkVariables:
-    private NetworkVariable<int> player1Resources = new NetworkVariable<int>(5);
-    private NetworkVariable<int> player2Resources = new NetworkVariable<int>(5);
+    // Centralized resource management with NetworkVariables
+    private NetworkVariable<int> player1Resources = new NetworkVariable<int>(5, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private NetworkVariable<int> player2Resources = new NetworkVariable<int>(5, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private void Awake()
     {
@@ -23,6 +23,8 @@ public class ResourceManager : NetworkBehaviour
     // Helper to read the correct field
     public int GetResources(Player player)
     {
+        if (!IsSpawned) return 0;
+
         if (player == Player.Player1)
             return player1Resources.Value;
         else
@@ -40,8 +42,12 @@ public class ResourceManager : NetworkBehaviour
         else
             player2Resources.Value += amount;
 
-        // Once done, call a client RPC so *all* clients update their UI
+        // Update all clients
         UpdateResourceClientRpc();
+
+        // Force immediate UI update on server
+        if (TurnManager.Instance != null)
+            TurnManager.Instance.UpdateResourceUI();
     }
 
     // Tells *all* clients to refresh
@@ -63,6 +69,19 @@ public class ResourceManager : NetworkBehaviour
             player1Resources.Value = 5;
             player2Resources.Value = 5;
         }
+
+        // Subscribe to resource value changes
+        player1Resources.OnValueChanged += (_, _) => UpdateUI();
+        player2Resources.OnValueChanged += (_, _) => UpdateUI();
+
+        // Initial UI update
+        UpdateUI();
+    }
+
+    private void UpdateUI()
+    {
+        if (TurnManager.Instance != null)
+            TurnManager.Instance.UpdateResourceUI();
     }
 
     public bool SpendResources(Player player, int amount)

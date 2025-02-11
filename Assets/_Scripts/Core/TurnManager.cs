@@ -17,7 +17,7 @@ public class TurnManager : NetworkBehaviour
     [SerializeField] private Button endTurnButton;
 
     private bool gameStarted = false;
-    private bool gameOver = false; // **Fix: Explicitly initialized to false**
+    private bool gameOver = false;
 
     public static TurnManager Instance { get; private set; }
     public Player CurrentPlayer { get; private set; }
@@ -43,13 +43,13 @@ public class TurnManager : NetworkBehaviour
 
         TurnPlayTimer.text = $"Time Left: {Mathf.CeilToInt(turnTimer)}s";
         turnTimer -= Time.deltaTime;
-        // **If the timer reaches zero, force end turn**
+
         if (turnTimer <= 0)
         {
             if (IsServer)
                 EndTurn();
             else
-                EndTurnServerRpc(); // Client requests the server to end turn
+                EndTurnServerRpc();
         }
     }
 
@@ -63,11 +63,14 @@ public class TurnManager : NetworkBehaviour
         if (turnText != null)
             turnText.text = $"Turn: {CurrentPlayer}";
 
-        // **Directly update UI based on host/client**
+        // Initialize resource display
+        UpdateResourceUI();
+
+
         if (playerIdentityText != null)
             playerIdentityText.text = $"You are {(NetworkManager.Singleton.IsHost ? "Player 1" : "Player 2")}";
 
-        //This ensures I always have exactly one listener on your button.
+
         endTurnButton.onClick.RemoveAllListeners();
         endTurnButton.onClick.AddListener(() =>
         {
@@ -79,7 +82,7 @@ public class TurnManager : NetworkBehaviour
         UpdateEndTurnButton();
     }
 
- 
+
     private void UpdateEndTurnButton()
     {
         bool isMyTurn = NetworkManager.Singleton.LocalClientId == (CurrentPlayer == Player.Player1 ? (ulong)0 : (ulong)1);
@@ -94,19 +97,19 @@ public class TurnManager : NetworkBehaviour
 
     public void EndTurn()
     {
-        if (!IsServer) return; // Only the server should manage turns
+        if (!IsServer) return;
 
-        // Switch to the next player
+
         CurrentPlayer = (CurrentPlayer == Player.Player1) ? Player.Player2 : Player.Player1;
-        turnTimer = TurnTimeLimit; // Reset timer for new turn
+        turnTimer = TurnTimeLimit;
 
-        //  Ensure only the server adds resources
+
         ResourceManager.Instance.AddResourcesServerRpc(CurrentPlayer, 2);
 
-        // Debug log for testing
+
         Debug.Log($"[TurnManager] Turn switched. Current Player: {CurrentPlayer}");
 
-        // Sync turn change across all clients
+
         UpdateTurnClientRpc(CurrentPlayer);
     }
 
@@ -116,28 +119,26 @@ public class TurnManager : NetworkBehaviour
     private void UpdateTurnClientRpc(Player newTurnPlayer)
     {
         CurrentPlayer = newTurnPlayer;
-        turnTimer = TurnTimeLimit; // Reset timer for all clients
+        turnTimer = TurnTimeLimit;
 
         if (turnText != null)
             turnText.text = $"Turn: {CurrentPlayer}";
 
         UpdateEndTurnButton();
-        // **NEW: Refresh Resource UI**
-       // UpdateResourceUI();
+        UpdateResourceUI();
     }
     public void UpdateResourceUI()
     {
         if (ResourceManager.Instance == null || ResourceText == null)
             return;
 
-        // Figure out who I am
-        Player localPlayer = GetLocalPlayer();
-        Player opponentPlayer = GetOpponentPlayer();
+        Player localPlayer = NetworkManager.Singleton.IsHost ? Player.Player1 : Player.Player2;
+        Player opponentPlayer = localPlayer == Player.Player1 ? Player.Player2 : Player.Player1;
 
         int myResources = ResourceManager.Instance.GetResources(localPlayer);
         int oppResources = ResourceManager.Instance.GetResources(opponentPlayer);
 
-        // Show both counts in a single TMP text
+
         ResourceText.text = $"You: {myResources} | Opponent: {oppResources}";
     }
 
@@ -145,7 +146,7 @@ public class TurnManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void EndTurnServerRpc()
     {
-        if (IsServer) // Ensures only the server processes turn logic
+        if (IsServer)
         {
             EndTurn();
         }
@@ -153,13 +154,13 @@ public class TurnManager : NetworkBehaviour
 
     private Player GetLocalPlayer()
     {
-        // Host == Player1, Connected client == Player2
+
         return NetworkManager.Singleton.IsHost ? Player.Player1 : Player.Player2;
     }
 
     private Player GetOpponentPlayer()
     {
-        // If I'm Player1, opponent is Player2; else vice versa
+
         return GetLocalPlayer() == Player.Player1 ? Player.Player2 : Player.Player1;
     }
 
