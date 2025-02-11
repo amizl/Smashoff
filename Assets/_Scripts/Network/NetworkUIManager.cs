@@ -5,7 +5,7 @@ using TMPro;
 public class NetworkUIManager : NetworkBehaviour
 {
     public static NetworkUIManager Instance { get; private set; }
-    
+    [SerializeField] private SpawnMenuUI spawnMenuUI;
     [SerializeField] private GameObject lobbyUI;
     [SerializeField] private GameObject gameUI;
     [SerializeField] private GameObject ConnectionPanelUI;
@@ -29,6 +29,18 @@ public class NetworkUIManager : NetworkBehaviour
         //ToDo Ami change later to where the game start 
         //(maybe after player 1 place the first Unit )
         TurnManager.Instance.StartGame();
+
+        // If I'm Player 2 (client), disable spawn buttons on load
+        if (!IsServer)
+        {
+            UpdateTurnText(false);
+            spawnMenuUI.SetSpawnButtonsInteractable(false);
+        }
+        else
+        {
+            UpdateTurnText(true);
+            spawnMenuUI.SetSpawnButtonsInteractable(true);
+        }
     }
     
     public void UpdateResourceText(int resources)

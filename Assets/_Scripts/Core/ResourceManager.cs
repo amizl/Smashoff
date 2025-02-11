@@ -1,12 +1,13 @@
 using Unity.Netcode;
 using UnityEngine;
-using System.Collections.Generic;
 
 public class ResourceManager : NetworkBehaviour
 {
     public static ResourceManager Instance { get; private set; }
 
-    private Dictionary<Player, NetworkVariable<int>> resources;
+    // Instead of a dictionary, use two dedicated NetworkVariables:
+    private NetworkVariable<int> player1Resources = new NetworkVariable<int>(5);
+    private NetworkVariable<int> player2Resources = new NetworkVariable<int>(5);
 
     private void Awake()
     {
@@ -17,78 +18,65 @@ public class ResourceManager : NetworkBehaviour
             Destroy(gameObject);
             return;
         }
-
-        resources = new Dictionary<Player, NetworkVariable<int>>
-        {
-            { Player.Player1, new NetworkVariable<int>(5) },
-            { Player.Player2, new NetworkVariable<int>(5) }
-        };
     }
 
+    // Helper to read the correct field
     public int GetResources(Player player)
     {
-        return resources[player].Value;
+        if (player == Player.Player1)
+            return player1Resources.Value;
+        else
+            return player2Resources.Value;
     }
-
 
     [ServerRpc(RequireOwnership = false)]
     public void AddResourcesServerRpc(Player player, int amount)
     {
         if (!IsServer) return;
 
-        if (resources.ContainsKey(player))
-        {
-            resources[player].Value += amount;
-            Debug.Log($"[ResourceManager] {player} gained {amount} resources. New total: {resources[player].Value}");
+        // Update netvars for that player
+        if (player == Player.Player1)
+            player1Resources.Value += amount;
+        else
+            player2Resources.Value += amount;
 
-            // *** Broadcast to *all* clients now. ***
-            UpdateResourceForPlayerClientRpc(resources[player].Value, player);
-        }
+        // Once done, call a client RPC so *all* clients update their UI
+        UpdateResourceClientRpc();
     }
 
+    // Tells *all* clients to refresh
     [ClientRpc]
-    private void UpdateResourceForPlayerClientRpc(int newResourceAmount, Player updatedPlayer)
+    private void UpdateResourceClientRpc()
     {
-        // Figure out which player *I* am (Host == Player1, Client == Player2)
-        Player localPlayer = (NetworkManager.Singleton.LocalClientId == 0)
-            ? Player.Player1
-            : Player.Player2;
-
-        // If this update is for me, update my UI.
-        if (localPlayer == updatedPlayer)
-        {
-            TurnManager.Instance.UpdateResourceUI();
-        }
+        // NetVars now arrived => do final UI
+        TurnManager.Instance.UpdateResourceUI();
     }
 
-    private ulong GetClientIdForPlayer(Player player)
-    {
-        return (ulong)(player == Player.Player1 ? 0 : 1); // Cast int to ulong
-    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        // Only the server sets up initial values
+        // Only the server sets up (or resets) initial resource values
         if (IsServer)
         {
-            // Each player starts with 5 resources, for example
-            resources[Player.Player1].Value = 5;
-            resources[Player.Player2].Value = 5;
+            player1Resources.Value = 5;
+            player2Resources.Value = 5;
         }
     }
-
-
-
 
     public bool SpendResources(Player player, int amount)
     {
         if (!IsServer) return false; // Only the server modifies resources
 
-        if (resources[player].Value >= amount)
+        // Example: if player has enough, subtract
+        if (GetResources(player) >= amount)
         {
-            resources[player].Value -= amount;
-            Debug.Log($"[ResourceManager] {player} spent {amount} resources. Remaining: {resources[player].Value}");
+            if (player == Player.Player1)
+                player1Resources.Value -= amount;
+            else
+                player2Resources.Value -= amount;
+
             return true;
         }
         return false;

@@ -66,6 +66,9 @@ public class TurnManager : NetworkBehaviour
         // **Directly update UI based on host/client**
         if (playerIdentityText != null)
             playerIdentityText.text = $"You are {(NetworkManager.Singleton.IsHost ? "Player 1" : "Player 2")}";
+
+        //This ensures I always have exactly one listener on your button.
+        endTurnButton.onClick.RemoveAllListeners();
         endTurnButton.onClick.AddListener(() =>
         {
             if (IsServer)
@@ -120,15 +123,22 @@ public class TurnManager : NetworkBehaviour
 
         UpdateEndTurnButton();
         // **NEW: Refresh Resource UI**
-        UpdateResourceUI();
+       // UpdateResourceUI();
     }
     public void UpdateResourceUI()
     {
-        if (ResourceManager.Instance != null && ResourceText != null)
-        {
-            int playerResources = ResourceManager.Instance.GetResources(CurrentPlayer);
-            ResourceText.text = $"Resources: {playerResources}";
-        }
+        if (ResourceManager.Instance == null || ResourceText == null)
+            return;
+
+        // Figure out who I am
+        Player localPlayer = GetLocalPlayer();
+        Player opponentPlayer = GetOpponentPlayer();
+
+        int myResources = ResourceManager.Instance.GetResources(localPlayer);
+        int oppResources = ResourceManager.Instance.GetResources(opponentPlayer);
+
+        // Show both counts in a single TMP text
+        ResourceText.text = $"You: {myResources} | Opponent: {oppResources}";
     }
 
 
@@ -141,6 +151,17 @@ public class TurnManager : NetworkBehaviour
         }
     }
 
+    private Player GetLocalPlayer()
+    {
+        // Host == Player1, Connected client == Player2
+        return NetworkManager.Singleton.IsHost ? Player.Player1 : Player.Player2;
+    }
+
+    private Player GetOpponentPlayer()
+    {
+        // If I'm Player1, opponent is Player2; else vice versa
+        return GetLocalPlayer() == Player.Player1 ? Player.Player2 : Player.Player1;
+    }
 
     public void EndGame()
     {
