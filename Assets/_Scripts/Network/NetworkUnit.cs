@@ -13,8 +13,8 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     private NetworkVariable<int> currentHP = new NetworkVariable<int>();
     private NetworkVariable<int> attackPower = new NetworkVariable<int>();
     private NetworkVariable<Vector2Int> gridPosition = new NetworkVariable<Vector2Int>();
-    
-   
+
+
     public int unitID;
     public Vector3 position;
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -22,12 +22,12 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         serializer.SerializeValue(ref unitID);
         serializer.SerializeValue(ref position);
     }
-    
+
     [ServerRpc(RequireOwnership = false)]
     public void InitializeServerRpc(UnitType type, Vector2Int position, ulong ownerId)
     {
         Type = type;
-        Owner = (ownerId == 0) ? Player.Player1 : Player.Player2; // Assign the player
+        Owner = (ownerId == 0) ? Player.Player1 : Player.Player2;
 
         // Set unit stats
         switch (type)
@@ -50,19 +50,84 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         }
         CurrentHP = MaxHP;
 
-        // Deduct resources when spawning the unit
         ResourceManager.Instance.SpendResources(Owner, Cost);
-
-        // Store grid position and place unit in the world
         gridPosition.Value = position;
         transform.position = GridManager.Instance.GetWorldPosition(position.x, position.y);
 
-        // Mark the cell as occupied
         var cell = GridManager.Instance.GetCell(position.x, position.y);
         if (cell != null)
         {
             cell.SetOccupyingUnit(this);
         }
+
+        //  Sync color and scale across all clients
+        UpdateUnitVisualsClientRpc(Owner == Player.Player1 ? Color.yellow : Color.cyan, Owner == Player.Player2);
+    }
+   
+    [ClientRpc]
+    private void UpdateUnitVisualsClientRpc(Color unitColor, bool flipSprite)
+    {
+        SpriteRenderer spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = unitColor;
+        }
+
+        if (flipSprite)
+        {
+            transform.localScale = new Vector3(-1, 1, 1);
+        }
+        else
+        {
+            transform.localScale = Vector3.one;
+        }
+    }
+    [ServerRpc(RequireOwnership = false)]
+    public void MoveForwardServerRpc()
+    {
+        Debug.Log($"[Server] MoveForwardServerRpc called for {Owner} at {gridPosition.Value}");
+
+        Vector2Int newPos = gridPosition.Value;
+        newPos.y += Owner == Player.Player1 ? 1 : -1; // Move right/left
+
+        if (GridManager.Instance.IsValidPosition(newPos.x, newPos.y))
+        {
+            var targetCell = GridManager.Instance.GetCell(newPos.x, newPos.y);
+            if (targetCell != null && !targetCell.IsOccupied())
+            {
+                // Clear old cell
+                var oldCell = GridManager.Instance.GetCell(gridPosition.Value.x, gridPosition.Value.y);
+                if (oldCell != null)
+                {
+                    oldCell.ClearOccupant();
+                }
+
+                // Update position on server
+                gridPosition.Value = newPos;
+                Debug.Log($"[Server] Moving unit to {newPos}");
+
+                //  Sync movement to all clients
+                UpdatePositionClientRpc(newPos);
+
+                // Set new cell as occupied
+                targetCell.SetOccupyingUnit(this);
+            }
+            else
+            {
+                Debug.Log("[Server] Target cell is occupied or null.");
+            }
+        }
+        else
+        {
+            Debug.Log("[Server] Invalid move position.");
+        }
+    }
+
+    [ClientRpc]
+    private void UpdatePositionClientRpc(Vector2Int newPos)
+    {
+        Debug.Log($"[Client] Received movement update to {newPos}");
+        transform.position = GridManager.Instance.GetWorldPosition(newPos.x, newPos.y);
     }
 
     public override void OnNetworkSpawn()
@@ -73,7 +138,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             attackPower.Value = GetInitialAttackPower();
         }
     }
-    
+
     [ServerRpc]
     public void MoveUnitServerRpc(Vector2Int newPosition)
     {
@@ -83,7 +148,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             transform.position = GridManager.Instance.GetWorldPosition(newPosition.x, newPosition.y);
         }
     }
-    
+
     [ServerRpc]
     public void AttackUnitServerRpc(NetworkUnit target)
     {
@@ -93,7 +158,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             target.TakeDamageServerRpc(damage);
         }
     }
-    
+
     [ServerRpc]
     public void TakeDamageServerRpc(int damage)
     {
@@ -103,23 +168,23 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             NetworkObject.Despawn();
         }
     }
-    
+
     private bool IsValidMove(Vector2Int newPos)
     {
         return GridManager.Instance.IsValidPosition(newPos.x, newPos.y) &&
                Vector2Int.Distance(gridPosition.Value, newPos) == 1;
     }
-    
+
     private bool IsAdjacentTo(NetworkUnit other)
     {
         return Vector2Int.Distance(gridPosition.Value, other.gridPosition.Value) == 1;
     }
-    
+
     private int CalculateDamage(NetworkUnit defender)
     {
         return Mathf.Max(1, attackPower.Value - defender.currentHP.Value);
     }
-    
+
     private int GetInitialHP()
     {
         switch (Type)
@@ -130,7 +195,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             default: return 0;
         }
     }
-    
+
     private int GetInitialAttackPower()
     {
         switch (Type)
@@ -144,7 +209,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     [ClientRpc]
     public void RequestParentClientRpc(string parentObjectName)
     {
-        if (!IsServer) return; // **Only the server can reparent**
+        if (!IsServer) return;
 
         Transform newParent = GameObject.Find(parentObjectName)?.transform;
         if (newParent != null)

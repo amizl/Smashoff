@@ -99,16 +99,22 @@ public class TurnManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        // Move all units before switching turn
+        NetworkUnit[] units = FindObjectsByType<NetworkUnit>(FindObjectsSortMode.None);
+        foreach (NetworkUnit unit in units)
+        {
+            if (unit.Owner == CurrentPlayer)
+            {
+                unit.MoveForwardServerRpc();
+            }
+        }
 
         CurrentPlayer = (CurrentPlayer == Player.Player1) ? Player.Player2 : Player.Player1;
         turnTimer = TurnTimeLimit;
 
-
         ResourceManager.Instance.AddResourcesServerRpc(CurrentPlayer, 2);
 
-
         Debug.Log($"[TurnManager] Turn switched. Current Player: {CurrentPlayer}");
-
 
         UpdateTurnClientRpc(CurrentPlayer);
     }
