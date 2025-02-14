@@ -12,8 +12,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
 
     private NetworkVariable<int> currentHP = new NetworkVariable<int>();
     private NetworkVariable<int> attackPower = new NetworkVariable<int>();
-    private NetworkVariable<Vector2Int> gridPosition = new NetworkVariable<Vector2Int>();
-
+    public NetworkVariable<Vector2Int> gridPosition = new NetworkVariable<Vector2Int>();
 
     public int unitID;
     public Vector3 position;
@@ -28,6 +27,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     {
         Type = type;
         Owner = (ownerId == 0) ? Player.Player1 : Player.Player2;
+        Debug.Log($"[Server] Initializing unit at {position} for {Owner}");
 
         // Set unit stats
         switch (type)
@@ -51,8 +51,17 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         CurrentHP = MaxHP;
 
         ResourceManager.Instance.SpendResources(Owner, Cost);
+
+        Debug.Log($"[Server] Setting gridPosition.Value = {position}");
+
         gridPosition.Value = position;
         transform.position = GridManager.Instance.GetWorldPosition(position.x, position.y);
+
+        // Ensure ALL clients update their position
+        UpdatePositionClientRpc(gridPosition.Value);
+
+        // Ensure parent assignment
+        RequestParentServerRpc("Units");
 
         var cell = GridManager.Instance.GetCell(position.x, position.y);
         if (cell != null)
@@ -60,10 +69,11 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             cell.SetOccupyingUnit(this);
         }
 
-        //  Sync color and scale across all clients
+        // Sync color and scale across all clients
         UpdateUnitVisualsClientRpc(Owner == Player.Player1 ? Color.yellow : Color.cyan, Owner == Player.Player2);
+        Debug.Log($"[Server] Finalized unit spawn at {gridPosition.Value}");
     }
-   
+
     [ClientRpc]
     private void UpdateUnitVisualsClientRpc(Color unitColor, bool flipSprite)
     {
@@ -82,34 +92,40 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             transform.localScale = Vector3.one;
         }
     }
+
     [ServerRpc(RequireOwnership = false)]
     public void MoveForwardServerRpc()
     {
+        Debug.Log($"Running MoveForwardServerRpc");
+        Debug.Log($"[Server] Unit {unitID} owned by {Owner} moving from {gridPosition.Value}");
         Debug.Log($"[Server] MoveForwardServerRpc called for {Owner} at {gridPosition.Value}");
 
         Vector2Int newPos = gridPosition.Value;
-        newPos.y += Owner == Player.Player1 ? 1 : -1; // Move right/left
+        newPos.x += Owner == Player.Player1 ? 1 : -1; // Move right/left
 
+        Debug.Log($"[Server] Attempting to move to {newPos}");
+        Debug.Log($"[Server] Attempting to move unit from {gridPosition.Value} to {newPos} for {Owner}");
         if (GridManager.Instance.IsValidPosition(newPos.x, newPos.y))
         {
             var targetCell = GridManager.Instance.GetCell(newPos.x, newPos.y);
             if (targetCell != null && !targetCell.IsOccupied())
             {
-                // Clear old cell
                 var oldCell = GridManager.Instance.GetCell(gridPosition.Value.x, gridPosition.Value.y);
                 if (oldCell != null)
                 {
                     oldCell.ClearOccupant();
                 }
 
-                // Update position on server
-                gridPosition.Value = newPos;
                 Debug.Log($"[Server] Moving unit to {newPos}");
 
-                //  Sync movement to all clients
+                gridPosition.Value = newPos; // Server updates gridPosition
+                transform.position = GridManager.Instance.GetWorldPosition(newPos.x, newPos.y);
+
+                Debug.Log($"[Server] Updated gridPosition: {gridPosition.Value}");
+
+                // Sync movement to clients
                 UpdatePositionClientRpc(newPos);
 
-                // Set new cell as occupied
                 targetCell.SetOccupyingUnit(this);
             }
             else
@@ -126,8 +142,11 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     [ClientRpc]
     private void UpdatePositionClientRpc(Vector2Int newPos)
     {
-        Debug.Log($"[Client] Received movement update to {newPos}");
-        transform.position = GridManager.Instance.GetWorldPosition(newPos.x, newPos.y);
+        if (IsServer) return;
+        Debug.Log($"[Client] Received position update: {newPos}");
+
+        // Update the transform position directly (the gridPosition will be synced automatically)
+        UpdateTransformPosition(newPos);
     }
 
     public override void OnNetworkSpawn()
@@ -137,15 +156,51 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             currentHP.Value = GetInitialHP();
             attackPower.Value = GetInitialAttackPower();
         }
+        else
+        {
+            // Subscribe to gridPosition changes so that when the value changes,
+            // we update the transform accordingly.
+            gridPosition.OnValueChanged += OnGridPositionChanged;
+
+            // Force an initial update in case gridPosition already has a valid value.
+            UpdateTransformPosition(gridPosition.Value);
+        }
+    }
+    private void OnGridPositionChanged(Vector2Int oldPos, Vector2Int newPos)
+    {
+        Debug.Log($"[Client] gridPosition changed from {oldPos} to {newPos}");
+        UpdateTransformPosition(newPos);
+    }
+    private void UpdateTransformPosition(Vector2Int pos)
+    {
+        if (GridManager.Instance != null)
+        {
+            Vector3 worldPos = GridManager.Instance.GetWorldPosition(pos.x, pos.y);
+            Debug.Log($"[Client] Converting grid ({pos.x}, {pos.y}) to world position {worldPos}");
+            transform.position = worldPos;
+        }
+        else
+        {
+            Debug.LogWarning("[Client] GridManager instance is null!");
+        }
     }
 
     [ServerRpc]
     public void MoveUnitServerRpc(Vector2Int newPosition)
     {
+        Debug.Log($"[Server] Moving unit to {newPosition}");
+
         if (IsValidMove(newPosition))
         {
             gridPosition.Value = newPosition;
             transform.position = GridManager.Instance.GetWorldPosition(newPosition.x, newPosition.y);
+
+            // Ensure all clients receive the updated position
+            UpdatePositionClientRpc(newPosition);
+        }
+        else
+        {
+            Debug.LogError($"[Server] Invalid move to {newPosition}!");
         }
     }
 
@@ -206,16 +261,20 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             default: return 0;
         }
     }
-    [ClientRpc]
-    public void RequestParentClientRpc(string parentObjectName)
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestParentServerRpc(string parentObjectName)
     {
-        if (!IsServer) return;
+        if (!IsServer) return; // Ensure this runs only on the server
 
         Transform newParent = GameObject.Find(parentObjectName)?.transform;
         if (newParent != null)
         {
             transform.SetParent(newParent);
         }
+        else
+        {
+            Debug.LogWarning($"[Server] Could not find parent object: {parentObjectName}");
+        }
     }
-
 }

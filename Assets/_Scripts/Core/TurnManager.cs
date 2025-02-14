@@ -22,7 +22,6 @@ public class TurnManager : NetworkBehaviour
     public static TurnManager Instance { get; private set; }
     public Player CurrentPlayer { get; private set; }
     public float TurnTimeLimit = 15f;
-    public event Action<Player> OnTurnChanged;
 
     private float turnTimer;
 

@@ -1307,7 +1307,7 @@ MonoBehaviour:
   playerIdentityText: {fileID: 1936607179}
   turnText: {fileID: 1136088970}
   endTurnButton: {fileID: 1368240268}
-  TurnTimeLimit: 15
+  TurnTimeLimit: 1000
 --- !u!114 &154783447
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1,8 +1,10 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class Cell : MonoBehaviour, IPointerClickHandler
 {
+    private TextMeshPro textMeshPro;
     public int Row { get; private set; }
     public int Col { get; private set; }
     public TerrainType Terrain { get; private set; }
@@ -23,6 +25,13 @@ public class Cell : MonoBehaviour, IPointerClickHandler
         if (spriteRenderer != null)
         {
             originalColor = spriteRenderer.color; // **NEW: Store the original color**
+        }
+        textMeshPro = GetComponentInChildren<TextMeshPro>();
+        // Add TextMeshPro to display row and column
+        textMeshPro = GetComponentInChildren<TextMeshPro>();
+        if (textMeshPro != null)
+        {
+            textMeshPro.text = $"{row},{col}"; // Show grid coordinates
         }
     }
 

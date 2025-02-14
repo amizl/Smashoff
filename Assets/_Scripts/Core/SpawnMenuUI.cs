@@ -32,7 +32,7 @@ public class SpawnMenuUI : MonoBehaviour
 
     [ServerRpc]
     private void RequestSpawnUnitServerRpc(UnitType type, Vector2Int cell, ulong clientId)
-    {
+    {Debug.Log("RequestSpawnUnitServerRpc Selected cell =" +cell + "ClientId="+clientId+" Unit type="+type);
         NetworkGameManager.Instance.SpawnUnitServerRpc(type, cell, clientId);
     }
     public void SetSpawnButtonsInteractable(bool state)

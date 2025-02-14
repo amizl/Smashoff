@@ -12,6 +12,9 @@ public class GridManager : MonoBehaviour
     public int columns = 8;
     public float cellSize = 1f;
 
+    // NEW: Declare an origin variable.
+    public Vector3 origin;
+
     private Cell[,] grid;
 
     private void Awake()
@@ -21,30 +24,36 @@ public class GridManager : MonoBehaviour
 
         InitializeGrid();
     }
+
     private void InitializeGrid()
     {
-        grid = new Cell[rows, columns];
+        grid = new Cell[columns, rows];
 
         float gridWidth = columns * cellSize;
         float gridHeight = rows * cellSize;
+        // Calculate the start position of the grid (this will be our origin)
         Vector3 startPosition = new Vector3(
             -gridWidth / 2 + cellSize / 2,
             -gridHeight / 2 + cellSize / 2,
             0
         );
 
-        for (int r = 0; r < rows; r++)
+        // NEW: Store startPosition as the origin.
+        origin = startPosition;
+
+        for (int x = 0; x < columns; x++)
         {
-            for (int c = 0; c < columns; c++)
+            for (int y = 0; y < rows; y++)
             {
-                Vector3 position = new Vector3(c * cellSize, r * cellSize, 0) + startPosition;
+                // Calculate each cell's position relative to the origin.
+                Vector3 position = new Vector3(x * cellSize, y * cellSize, 0) + startPosition;
                 GameObject cellObj = Instantiate(cellPrefab, position, Quaternion.identity, CellsDirectory.transform);
 
                 Cell cellComponent = cellObj.GetComponent<Cell>();
-                TerrainType terrain = GenerateRandomTerrain(); //Assign random terrain
-                cellComponent.Initialize(r, c, terrain); //Pass terrain to cell
+                TerrainType terrain = GenerateRandomTerrain();
+                cellComponent.Initialize(x, y, terrain);  // Now x is column, y is row
 
-                grid[r, c] = cellComponent;
+                grid[x, y] = cellComponent;
             }
         }
     }
@@ -60,15 +69,22 @@ public class GridManager : MonoBehaviour
         return TerrainType.Normal;
     }
 
-    public Vector3 GetWorldPosition(int row, int col)
+    // NEW: Update GetWorldPosition to calculate from origin.
+    // (x, y) are the grid coordinates.
+    public Vector3 GetWorldPosition(int x, int y)
     {
-        if (!IsValidPosition(row, col)) return Vector3.zero;
-        return grid[row, col].transform.position;
+        // You can either return the precomputed cell position...
+        // if (!IsValidPosition(y, x)) return Vector3.zero;
+        // return grid[x, y].transform.position;
+
+        // ...or calculate it using origin and cellSize:
+        return origin + new Vector3(x * cellSize, y * cellSize, 0);
     }
 
-    public bool IsValidPosition(int row, int col)
+    public bool IsValidPosition(int x, int y)
     {
-        return row >= 0 && row < rows && col >= 0 && col < columns;
+     //   return row >= 0 && row < rows && col >= 0 && col < columns;
+        return x >= 0 && x < columns && y >= 0 && y < rows;
     }
 
     public Cell GetCell(int row, int col)
@@ -87,29 +103,22 @@ public class GridManager : MonoBehaviour
         return selectedCell;
     }
 
-    // Convert world position to grid coordinates
+    // Convert world position to grid coordinates using the origin.
     public Vector2Int GetGridPositionFromWorld(Vector3 worldPosition)
     {
-        float gridWidth = columns * cellSize;
-        float gridHeight = rows * cellSize;
-        Vector3 startPosition = new Vector3(
-            -gridWidth / 2 + cellSize / 2,
-            -gridHeight / 2 + cellSize / 2,
-            0
-        );
-
-        int col = Mathf.RoundToInt((worldPosition.x - startPosition.x) / cellSize);
-        int row = Mathf.RoundToInt((worldPosition.y - startPosition.y) / cellSize);
+        // Use the origin we stored during initialization.
+        int col = Mathf.RoundToInt((worldPosition.x - origin.x) / cellSize);
+        int row = Mathf.RoundToInt((worldPosition.y - origin.y) / cellSize);
 
         if (IsValidPosition(row, col))
             return new Vector2Int(row, col);
 
         return new Vector2Int(-1, -1); // Invalid position
     }
+
     public void DeselectAllCells()
     {
         foreach (var cell in FindObjectsByType<Cell>(FindObjectsSortMode.None))
             cell.HighlightCell(false);
     }
-
 }
