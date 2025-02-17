@@ -8,7 +8,20 @@ public class SpawnMenuUI : MonoBehaviour
     [SerializeField] private Button spawnTankButton;
     [SerializeField] private Button spawnJeepButton;
     [SerializeField] private Button spawnSoldierButton;
-
+    [SerializeField] private VerticalLayoutGroup verticalLayoutGroup;
+    private void Start()
+    {
+        // If this is NOT the host => we assume it's Player 2
+        if (!NetworkManager.Singleton.IsHost)
+        {
+            verticalLayoutGroup.childAlignment = TextAnchor.UpperRight;
+        }
+        else
+        {
+            // If you want to ensure Player 1 is always UpperLeft:
+            verticalLayoutGroup.childAlignment = TextAnchor.UpperLeft;
+        }
+    }
     private void Awake()
     {
         spawnTankButton.onClick.AddListener(() => SpawnUnit(UnitType.Tank));

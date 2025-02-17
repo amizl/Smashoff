@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using System;
 using TMPro;
@@ -5,6 +6,7 @@ using UnityEngine.UI;
 using Unity.Netcode;
 using Unity.Services.Qos.V2.Models;
 using System.Resources;
+using Unity.Multiplayer.Playmode;
 
 public class TurnManager : NetworkBehaviour
 {
@@ -93,34 +95,45 @@ public class TurnManager : NetworkBehaviour
             spawnMenuUI.SetSpawnButtonsInteractable(isMyTurn);
     }
 
-
     public void EndTurn()
     {
         if (!IsServer) return;
 
-        // Move all units before switching turn
-        NetworkUnit[] units = FindObjectsByType<NetworkUnit>(FindObjectsSortMode.None);
-        foreach (NetworkUnit unit in units)
+        // Find all friendly units that belong to the current player.
+        var friendlyUnits = FindObjectsByType<NetworkUnit>(FindObjectsSortMode.None)
+                                .Where(unit => unit.Owner == CurrentPlayer)
+                                .ToList();
+
+        // Sort them based on grid position.
+        // For Player1, higher x means more advanced; for Player2, lower x means more advanced.
+        if (CurrentPlayer == Player.Player1)
         {
-            if (unit.Owner == CurrentPlayer)
-            {
-                unit.MoveForwardServerRpc();
-            }
+            friendlyUnits = friendlyUnits.OrderByDescending(unit => unit.gridPosition.Value.x)
+                                         .ThenBy(unit => unit.gridPosition.Value.y)
+                                         .ToList();
+        }
+        else
+        {
+            friendlyUnits = friendlyUnits.OrderBy(unit => unit.gridPosition.Value.x)
+                                         .ThenBy(unit => unit.gridPosition.Value.y)
+                                         .ToList();
         }
 
+        // Move each unit in the sorted order.
+        foreach (NetworkUnit unit in friendlyUnits)
+        {
+            unit.MoveForwardServerRpc();
+        }
+
+        // Switch turn and reset timer/resources.
         CurrentPlayer = (CurrentPlayer == Player.Player1) ? Player.Player2 : Player.Player1;
         turnTimer = TurnTimeLimit;
-
         ResourceManager.Instance.AddResourcesServerRpc(CurrentPlayer, 2);
-
         Debug.Log($"[TurnManager] Turn switched. Current Player: {CurrentPlayer}");
-
         UpdateTurnClientRpc(CurrentPlayer);
     }
 
-
-
-    [ClientRpc]
+[ClientRpc]
     private void UpdateTurnClientRpc(Player newTurnPlayer)
     {
         CurrentPlayer = newTurnPlayer;
