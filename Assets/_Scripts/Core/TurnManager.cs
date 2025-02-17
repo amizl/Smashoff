@@ -124,7 +124,12 @@ public class TurnManager : NetworkBehaviour
         {
             unit.MoveForwardServerRpc();
         }
-
+        // Check for victory condition.
+        if (CheckVictoryCondition())
+        {
+            EndGame(CurrentPlayer);
+            return;
+        }
         // Switch turn and reset timer/resources.
         CurrentPlayer = (CurrentPlayer == Player.Player1) ? Player.Player2 : Player.Player1;
         turnTimer = TurnTimeLimit;
@@ -181,10 +186,43 @@ public class TurnManager : NetworkBehaviour
 
         return GetLocalPlayer() == Player.Player1 ? Player.Player2 : Player.Player1;
     }
+    private bool CheckVictoryCondition()
+    {
+        int boardWidth = GridManager.Instance.rows;
+        int boardHeight = GridManager.Instance.columns;
 
-    public void EndGame()
+        // For Player1, a win is when a Player1 unit occupies any cell in the rightmost column.
+        if (CurrentPlayer == Player.Player1)
+        {
+            for (int y = 0; y < boardHeight; y++)
+            {
+                var cell = GridManager.Instance.GetCell(boardWidth - 1, y);
+                if (cell != null && cell.IsOccupied() && cell.OccupyingUnit.Owner == Player.Player1)
+                {
+                    Debug.Log("[TurnManager] Victory condition met for Player1");
+                    return true;
+                }
+            }
+        }
+        else // For Player2, check the leftmost column.
+        {
+            for (int y = 0; y < boardHeight; y++)
+            {
+                var cell = GridManager.Instance.GetCell(0, y);
+                if (cell != null && cell.IsOccupied() && cell.OccupyingUnit.Owner == Player.Player2)
+                {
+                    Debug.Log("[TurnManager] Victory condition met for Player2");
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public void EndGame(Player CurrentPlayer)
     {
         gameOver = true;
-        Debug.Log("Game Over!");
+        Debug.Log($"Game Over! player {CurrentPlayer} wins");
     }
 }
