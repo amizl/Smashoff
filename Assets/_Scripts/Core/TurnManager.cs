@@ -224,10 +224,10 @@ public class TurnManager : NetworkBehaviour
     {
         gameOver = true;
         Debug.Log($"Game Over! player {CurrentPlayer} wins");
-        ShowGameOverOptions(winner);
+        ShowGameOverOptionsClientRpc(winner);
     }
-   
-    private void ShowGameOverOptions(Player winner)
+    [ClientRpc]
+    private void ShowGameOverOptionsClientRpc(Player winner)
     {
         turnText.text = $"Player {winner} Wins!";
         endTurnButton.onClick.RemoveAllListeners();
