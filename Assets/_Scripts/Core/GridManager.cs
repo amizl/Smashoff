@@ -121,4 +121,12 @@ public class GridManager : MonoBehaviour
         foreach (var cell in FindObjectsByType<Cell>(FindObjectsSortMode.None))
             cell.HighlightCell(false);
     }
+    public void ResetBoard()
+    {
+        foreach (var cell in FindObjectsByType<Cell>(FindObjectsSortMode.None))
+        {
+            cell.ClearOccupant(); // Make sure all cells are empty
+        }
+    }
+
 }

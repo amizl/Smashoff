@@ -8,6 +8,7 @@ public class ResourceManager : NetworkBehaviour
     // Centralized resource management with NetworkVariables
     private NetworkVariable<int> player1Resources = new NetworkVariable<int>(5, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private NetworkVariable<int> player2Resources = new NetworkVariable<int>(5, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private const int startingResources = 5; // Adjust as needed
 
     private void Awake()
     {
@@ -99,5 +100,10 @@ public class ResourceManager : NetworkBehaviour
             return true;
         }
         return false;
+    }
+    public void ResetResources()
+    {
+        player1Resources.Value = startingResources;
+        player2Resources.Value = startingResources;
     }
 }
