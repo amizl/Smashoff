@@ -17,7 +17,7 @@ public class TurnManager : NetworkBehaviour
     [SerializeField] private TextMeshProUGUI playerIdentityText;
     [SerializeField] private TextMeshProUGUI turnText;
     [SerializeField] private Button endTurnButton;
-
+  
     private bool gameStarted = false;
     private bool gameOver = false;
 
@@ -188,8 +188,8 @@ public class TurnManager : NetworkBehaviour
     }
     private bool CheckVictoryCondition()
     {
-        int boardWidth = GridManager.Instance.rows;
-        int boardHeight = GridManager.Instance.columns;
+        int boardWidth = GridManager.Instance.columns;
+        int boardHeight = GridManager.Instance.rows;
 
         // For Player1, a win is when a Player1 unit occupies any cell in the rightmost column.
         if (CurrentPlayer == Player.Player1)
@@ -220,9 +220,22 @@ public class TurnManager : NetworkBehaviour
         return false;
     }
 
-    public void EndGame(Player CurrentPlayer)
+    public void EndGame(Player winner)
     {
         gameOver = true;
         Debug.Log($"Game Over! player {CurrentPlayer} wins");
+        ShowGameOverOptions(winner);
+    }
+   
+    private void ShowGameOverOptions(Player winner)
+    {
+        turnText.text = $"Player {winner} Wins!";
+        endTurnButton.onClick.RemoveAllListeners();
+        endTurnButton.GetComponentInChildren<TextMeshProUGUI>().text = "Play Again";
+        endTurnButton.onClick.AddListener(() => RequestPlayAgain());
+    }
+    private void RequestPlayAgain()
+    {
+        Debug.Log("Play Again button clicked - Next step: Handle player agreement");
     }
 }
