@@ -31,6 +31,17 @@ public class SpawnMenuUI : MonoBehaviour
 
     private void SpawnUnit(UnitType type)
     {
+        Debug.Log("ConnectedClients.Count=" + NetworkManager.Singleton.ConnectedClients.Count);
+        if (NetworkManager.Singleton.ConnectedClients.Count <2) 
+        {
+            NetworkGameManager.Instance.MessageBoardTMP.gameObject.SetActive(true); 
+            NetworkGameManager.Instance.MessageBoardTMP.text = "Waiting for Player 2 to join before starting"; 
+            Debug.Log("Waiting for Player 2 to join before starting.");
+            return; // Prevents Player 1 from starting actions
+        }
+        NetworkGameManager.Instance.MessageBoardTMP.gameObject.SetActive(false);
+
+        
         // **NEW: Let all clients request spawn via ServerRpc**
         Vector2Int selectedCell = GridManager.Instance.GetSelectedCell();
         if (selectedCell.x == -1 || selectedCell.y == -1)

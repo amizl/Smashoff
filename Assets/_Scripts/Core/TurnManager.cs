@@ -20,7 +20,7 @@ public class TurnManager : NetworkBehaviour
     [SerializeField] private Button exitLobbyButton;
 
     private NetworkVariable<bool> player1Ready = new NetworkVariable<bool>(false);
-    private NetworkVariable<bool> player2Ready = new NetworkVariable<bool>(false);
+    public NetworkVariable<bool> player2Ready = new NetworkVariable<bool>(false);
     private bool gameOver = false;
     private bool gameStarted = false;
     private bool countdownStarted = false;
@@ -59,6 +59,7 @@ public class TurnManager : NetworkBehaviour
 
     public void StartGame()
     {
+    
         gameOver = false;
         gameStarted = true;
         turnTimer = TurnTimeLimit;
@@ -189,7 +190,7 @@ public class TurnManager : NetworkBehaviour
 
         return GetLocalPlayer() == Player.Player1 ? Player.Player2 : Player.Player1;
     }
-    private bool CheckVictoryCondition()
+    public bool CheckVictoryCondition()
     {
         int boardWidth = GridManager.Instance.columns;
         int boardHeight = GridManager.Instance.rows;
