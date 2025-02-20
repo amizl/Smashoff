@@ -23,7 +23,17 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         serializer.SerializeValue(ref unitID);
         serializer.SerializeValue(ref position);
     }
-
+    // Static method to get unit cost by type (single source of truth)
+    public static int GetCost(UnitType type)
+    {
+        switch (type)
+        {
+            case UnitType.Tank: return 4;
+            case UnitType.Jeep: return 2;
+            case UnitType.Soldier: return 1;
+            default: return 0; // Shouldn’t happen due to earlier validation
+        }
+    }
     [ServerRpc(RequireOwnership = false)]
     public void InitializeServerRpc(UnitType type, Vector2Int position, ulong ownerId)
     {
@@ -37,17 +47,17 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             case UnitType.Tank:
                 MaxHP = 10;
                 AttackPower = 5;
-                Cost = 4;
+                Cost = GetCost(UnitType.Tank);
                 break;
             case UnitType.Jeep:
                 MaxHP = 6;
                 AttackPower = 3;
-                Cost = 2;
+                Cost = GetCost(UnitType.Jeep); 
                 break;
             case UnitType.Soldier:
                 MaxHP = 3;
                 AttackPower = 1;
-                Cost = 1;
+                Cost = GetCost(UnitType.Soldier); 
                 break;
         }
         CurrentHP = MaxHP;

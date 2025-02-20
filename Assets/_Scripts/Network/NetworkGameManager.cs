@@ -27,6 +27,12 @@ public class NetworkGameManager : NetworkBehaviour
     {
         // Register the event to detect new connections
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+        // Disable MessageBoardTMP for this client when the game starts
+        if (MessageBoardTMP != null)
+        {
+            MessageBoardTMP.gameObject.SetActive(false);
+            Debug.Log($"[Client {NetworkManager.Singleton.LocalClientId}] MessageBoardTMP set to inactive on load.");
+        }
     }
     private void OnClientConnected(ulong clientId)
     {
@@ -81,6 +87,27 @@ public class NetworkGameManager : NetworkBehaviour
             Debug.LogError("Player 2 can only spawn in last and third-to-last columns");
             return;
         }
+
+        // Check resources before spawning
+        int cost = NetworkUnit.GetCost(type); // Helper method to get cost
+        Player owner = isPlayer1 ? Player.Player1 : Player.Player2;
+        if (!ResourceManager.Instance.SpendResources(owner, cost))
+        {
+            Debug.LogError($"Player {ownerClientId} has insufficient resources ({ResourceManager.Instance.GetResources(owner)} < {cost})");
+            return; // Abort if resources are insufficient
+        }
+        //// Helper method to get unit cost
+        //int GetUnitCost(UnitType type)
+        //{
+        //    switch (type)
+        //    {
+        //        case UnitType.Tank: return 4;
+        //        case UnitType.Jeep: return 2;
+        //        case UnitType.Soldier: return 1;
+        //        default: return 0; // Shouldn’t happen due to earlier validation
+        //    }
+        //}
+
 
         // Spawn the unit
         GameObject unit = Instantiate(unitPrefab);
