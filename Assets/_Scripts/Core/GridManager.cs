@@ -6,6 +6,11 @@ public class GridManager : MonoBehaviour
     private Vector2Int selectedCell = new Vector2Int(-1, -1); // Default: No cell selected
     public GameObject cellPrefab;
     public GameObject CellsDirectory;
+    public Sprite[] normalTiles;  // Assign tiles_0 to tiles_9
+    public Sprite attackTile;
+    public Sprite defenseTile;
+    public Sprite healingTile;
+    public Sprite resourceTile;
     public static GridManager Instance { get; private set; }
 
     public int rows = 5;
@@ -52,6 +57,9 @@ public class GridManager : MonoBehaviour
                 Cell cellComponent = cellObj.GetComponent<Cell>();
                 TerrainType terrain = GenerateRandomTerrain();
                 cellComponent.Initialize(x, y, terrain);  // Now x is column, y is row
+                                                          // Set the sprite based on the generated terrain
+                Sprite cellSprite = GetRandomTile();
+                cellComponent.SetTileSprite(cellSprite); // New!
 
                 grid[x, y] = cellComponent;
             }
@@ -127,6 +135,27 @@ public class GridManager : MonoBehaviour
         {
             cell.ClearOccupant(); // Make sure all cells are empty
         }
+    }
+
+    Sprite GetRandomTile()
+    {
+        float bonusChance = Random.value;
+
+        if (bonusChance < 0.1f) // 10% chance for a bonus tile
+        {
+            int bonusType = Random.Range(0, 4);
+            switch (bonusType)
+            {
+                case 0: return attackTile; // New!
+                case 1: return defenseTile; // New!
+                case 2: return healingTile; // New!
+                case 3: return resourceTile; // New!
+            }
+        }
+
+        // Normal tile (90% chance)
+        int randomIndex = Random.Range(0, normalTiles.Length);
+        return normalTiles[randomIndex]; // New!
     }
 
 }

@@ -71,4 +71,12 @@ public class Cell : MonoBehaviour, IPointerClickHandler
             spriteRenderer.color = originalColor; // Revert to original color
         }
     }
+    public void SetTileSprite(Sprite sprite) // New!
+    {
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.sprite = sprite;
+        }
+    }
+
 }

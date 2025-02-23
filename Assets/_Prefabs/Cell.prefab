@@ -111,8 +111,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 2044919552
-  m_fontColor: {r: 0, g: 1, b: 0.8857477, a: 0.4745098}
+    rgba: 467861248
+  m_fontColor: {r: 0, g: 1, b: 0.8857477, a: 0.105882354}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -252,8 +252,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 0.9433962, g: 0.09344962, b: 0.09344962, a: 1}
+  m_Sprite: {fileID: 1807125615787039003, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

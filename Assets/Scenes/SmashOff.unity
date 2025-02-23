@@ -1329,6 +1329,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cellPrefab: {fileID: 8671810688088915647, guid: 20be0551821ca7c409a4a7af98e5dfd3, type: 3}
   CellsDirectory: {fileID: 1620286051}
+  normalTiles:
+  - {fileID: 1807125615787039003, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: 349823833441268365, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: -6614373457484812694, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: 1639214462598301798, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: 2157240733274199957, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: 4798128000316562087, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: -7995846982363831464, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: -4202638810691693305, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: -7708644975649761358, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  - {fileID: -1530080802165054831, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  attackTile: {fileID: 708719283, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  defenseTile: {fileID: 834780198, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  healingTile: {fileID: 1506984032, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
+  resourceTile: {fileID: 1350156317, guid: ef2b172a8a898ba42a8c270e8327f8d9, type: 3}
   rows: 5
   columns: 8
   cellSize: 1
@@ -9063,8 +9078,16 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8136874604410874564, guid: e07e238ce8a6c1941a58efab69f17a82, type: 3}
+      propertyPath: far clip plane
+      value: 500
+      objectReference: {fileID: 0}
+    - target: {fileID: 8136874604410874564, guid: e07e238ce8a6c1941a58efab69f17a82, type: 3}
+      propertyPath: near clip plane
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8136874604410874564, guid: e07e238ce8a6c1941a58efab69f17a82, type: 3}
       propertyPath: orthographic size
-      value: 4
+      value: 3.5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
