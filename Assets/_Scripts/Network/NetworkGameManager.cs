@@ -148,6 +148,8 @@ public class NetworkGameManager : NetworkBehaviour
 
             // Send the correct message to the opponent (Player 2 if Player 1 exits, and vice versa)
             InformOpponentOfChickenOutClientRpc(opponent);
+
+            NetworkGameManager.Instance.MessageBoardTMP.text = $"{playerExiting} has chickened out! {opponent} wins by default. Exiting to lobby...";
         }
         if (IsServer)
         {
