@@ -74,8 +74,8 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         }
         CurrentHP = MaxHP;
 
-        // Spend resources
-        ResourceManager.Instance.SpendResources(Owner, Cost);
+        // Removed: ResourceManager.Instance.SpendResources(Owner, Cost);
+        // Resources are now spent only in SpawnUnitServerRpc before this is called
 
         // Sync NetVars
         maxHP.Value = MaxHP;
