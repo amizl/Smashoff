@@ -1,8 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Unity.Netcode;
+using System;
 
-public class GridManager : MonoBehaviour
+public class GridManager : NetworkBehaviour
 {
+    private NetworkList<int> syncedGrid;
+    private NetworkVariable<Vector3> networkOrigin = new NetworkVariable<Vector3>(Vector3.zero); // Synced origin
+
     private Vector2Int selectedCell = new Vector2Int(-1, -1); // Default: No cell selected
     public GameObject cellPrefab;
     public GameObject CellsDirectory;
@@ -17,17 +22,30 @@ public class GridManager : MonoBehaviour
     public int columns = 8;
     public float cellSize = 1f;
 
-    // NEW: Declare an origin variable.
-    public Vector3 origin;
+    // Use networkOrigin instead of a public Vector3 origin
+    private Vector3 origin;  // Local reference, updated from networkOrigin
 
     private Cell[,] grid;
 
     private void Awake()
     {
+        syncedGrid = new NetworkList<int>();
+
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+    }
 
-        InitializeGrid();
+    [ServerRpc(RequireOwnership = false)]
+    private void SyncGridWithClientsServerRpc()
+    {
+        syncedGrid.Clear();
+        for (int x = 0; x < columns; x++)
+        {
+            for (int y = 0; y < rows; y++)
+            {
+                syncedGrid.Add((int)grid[x, y].Terrain); // Convert enum to int
+            }
+        }
     }
 
     private void InitializeGrid()
@@ -36,69 +54,56 @@ public class GridManager : MonoBehaviour
 
         float gridWidth = columns * cellSize;
         float gridHeight = rows * cellSize;
-        // Calculate the start position of the grid (this will be our origin)
         Vector3 startPosition = new Vector3(
             -gridWidth / 2 + cellSize / 2,
             -gridHeight / 2 + cellSize / 2,
             0
         );
 
-        // NEW: Store startPosition as the origin.
-        origin = startPosition;
+        // Set the network origin on the server
+        networkOrigin.Value = startPosition;
+        origin = networkOrigin.Value;  // Update local origin
 
         for (int x = 0; x < columns; x++)
         {
             for (int y = 0; y < rows; y++)
             {
-                // Calculate each cell's position relative to the origin.
-                Vector3 position = new Vector3(x * cellSize, y * cellSize, 0) + startPosition;
+                Vector3 position = origin + new Vector3(x * cellSize, y * cellSize, 0);
                 GameObject cellObj = Instantiate(cellPrefab, position, Quaternion.identity, CellsDirectory.transform);
-
+                cellObj.transform.position = position;  // Ensure exact positioning
                 Cell cellComponent = cellObj.GetComponent<Cell>();
                 TerrainType terrain = GenerateRandomTerrain();
-                cellComponent.Initialize(x, y, terrain);  // Now x is column, y is row
-                                                          // Set the sprite based on the generated terrain
-                Sprite cellSprite = GetRandomTile();
-                cellComponent.SetTileSprite(cellSprite); // New!
-
+                cellComponent.Initialize(x, y, terrain);
+                cellComponent.SetTileSprite(GetTileSpriteFromTerrain(terrain));
                 grid[x, y] = cellComponent;
             }
         }
     }
 
-    // Generates a random terrain type
     private TerrainType GenerateRandomTerrain()
     {
-        float random = Random.value;
-        if (random < 0.2f) return TerrainType.DefenseBonus;
-        if (random < 0.4f) return TerrainType.AttackBonus;
-        if (random < 0.6f) return TerrainType.ResourceGen;
-        if (random < 0.8f) return TerrainType.Healing;
+        float random = UnityEngine.Random.value;
+        if (random < 0.1f) return TerrainType.DefenseBonus;
+        if (random < 0.2f) return TerrainType.AttackBonus;
+        if (random < 0.3f) return TerrainType.ResourceGen;
+        if (random < 0.4f) return TerrainType.Healing;
         return TerrainType.Normal;
     }
 
-    // NEW: Update GetWorldPosition to calculate from origin.
-    // (x, y) are the grid coordinates.
     public Vector3 GetWorldPosition(int x, int y)
     {
-        // You can either return the precomputed cell position...
-        // if (!IsValidPosition(y, x)) return Vector3.zero;
-        // return grid[x, y].transform.position;
-
-        // ...or calculate it using origin and cellSize:
         return origin + new Vector3(x * cellSize, y * cellSize, 0);
     }
 
     public bool IsValidPosition(int x, int y)
     {
-     //   return row >= 0 && row < rows && col >= 0 && col < columns;
         return x >= 0 && x < columns && y >= 0 && y < rows;
     }
 
-    public Cell GetCell(int row, int col)
+    public Cell GetCell(int col, int row)
     {
-        if (!IsValidPosition(row, col)) return null;
-        return grid[row, col];
+        if (!IsValidPosition(col, row)) return null;
+        return grid[col, row];
     }
 
     public void SetSelectedCell(int row, int col)
@@ -111,51 +116,80 @@ public class GridManager : MonoBehaviour
         return selectedCell;
     }
 
-    // Convert world position to grid coordinates using the origin.
     public Vector2Int GetGridPositionFromWorld(Vector3 worldPosition)
     {
-        // Use the origin we stored during initialization.
         int col = Mathf.RoundToInt((worldPosition.x - origin.x) / cellSize);
         int row = Mathf.RoundToInt((worldPosition.y - origin.y) / cellSize);
 
-        if (IsValidPosition(row, col))
-            return new Vector2Int(row, col);
-
-        return new Vector2Int(-1, -1); // Invalid position
+        return IsValidPosition(col, row) ? new Vector2Int(col, row) : new Vector2Int(-1, -1);
     }
 
     public void DeselectAllCells()
     {
-        foreach (var cell in FindObjectsByType<Cell>(FindObjectsSortMode.None))
-            cell.HighlightCell(false);
+        for (int x = 0; x < columns; x++)
+            for (int y = 0; y < rows; y++)
+                if (grid[x, y] != null) grid[x, y].HighlightCell(false);
     }
+
     public void ResetBoard()
     {
-        foreach (var cell in FindObjectsByType<Cell>(FindObjectsSortMode.None))
-        {
-            cell.ClearOccupant(); // Make sure all cells are empty
-        }
+        for (int x = 0; x < columns; x++)
+            for (int y = 0; y < rows; y++)
+                if (grid[x, y] != null) grid[x, y].ClearOccupant();
     }
 
     Sprite GetRandomTile()
     {
-        float bonusChance = Random.value;
-
-        if (bonusChance < 0.1f) // 10% chance for a bonus tile
-        {
-            int bonusType = Random.Range(0, 4);
-            switch (bonusType)
-            {
-                case 0: return attackTile; // New!
-                case 1: return defenseTile; // New!
-                case 2: return healingTile; // New!
-                case 3: return resourceTile; // New!
-            }
-        }
-
-        // Normal tile (90% chance)
-        int randomIndex = Random.Range(0, normalTiles.Length);
-        return normalTiles[randomIndex]; // New!
+        int randomIndex = UnityEngine.Random.Range(0, normalTiles.Length);
+        return normalTiles[randomIndex];
     }
 
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer)
+        {
+            InitializeGrid();
+            SyncGridWithClientsServerRpc();
+        }
+        else
+        {
+            origin = networkOrigin.Value;  // Sync origin from server on client
+            ApplySyncedGrid();
+        }
+    }
+
+    private void ApplySyncedGrid()
+    {
+        grid = new Cell[columns, rows];
+        int index = 0;
+        for (int x = 0; x < columns; x++)
+        {
+            for (int y = 0; y < rows; y++)
+            {
+                TerrainType terrain = (TerrainType)syncedGrid[index++];
+                Vector3 position = origin + new Vector3(x * cellSize, y * cellSize, 0);
+                if (grid[x, y] == null)
+                {
+                    GameObject cellObj = Instantiate(cellPrefab, position, Quaternion.identity, CellsDirectory.transform);
+                    cellObj.transform.position = position;  // Ensure exact positioning
+                    Cell cellComponent = cellObj.GetComponent<Cell>();
+                    cellComponent.Initialize(x, y, terrain);
+                    grid[x, y] = cellComponent;
+                }
+                grid[x, y].SetTileSprite(GetTileSpriteFromTerrain(terrain));
+            }
+        }
+    }
+
+    private Sprite GetTileSpriteFromTerrain(TerrainType terrain)
+    {
+        switch (terrain)
+        {
+            case TerrainType.AttackBonus: return attackTile;
+            case TerrainType.DefenseBonus: return defenseTile;
+            case TerrainType.Healing: return healingTile;
+            case TerrainType.ResourceGen: return resourceTile;
+            default: return normalTiles[UnityEngine.Random.Range(0, normalTiles.Length)];
+        }
+    }
 }
