@@ -11,7 +11,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     [SerializeField] private Canvas canvasTransform;
 
     public UnitType Type { get; private set; }
-    private int MaxHP { get; set; }
+    private int MaxHP { get; set; }       // Still your local property
     public int CurrentHP { get; private set; }
     public int AttackPower { get; private set; }
     public int Cost { get; private set; }
@@ -26,9 +26,20 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     public int unitID;
     public Vector3 position;
 
-    // ---------------------------------------
-    //         INIT & SETUP
-    // ---------------------------------------
+    // ---------------------------------------------------------------
+    // --- NEW FIELDS for permanent, stackable bonuses
+    // ---------------------------------------------------------------
+    // We'll record the "base" stats so we can keep applying new bonuses
+    private int baseMaxHP;
+    private int baseAttackPower;
+
+    // We'll track how many times we've triggered defense or attack tiles
+    private NetworkVariable<int> defenseStacks = new NetworkVariable<int>(0);
+    private NetworkVariable<int> attackStacks = new NetworkVariable<int>(0);
+
+    // ---------------------------------------------------------------
+    //         INIT & SETUP (unchanged except new lines)
+    // ---------------------------------------------------------------
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
         serializer.SerializeValue(ref unitID);
@@ -74,12 +85,19 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         }
         CurrentHP = MaxHP;
 
+        // --- NEW: Store the "base" stats for permanent reference
+        baseMaxHP = MaxHP;
+        baseAttackPower = AttackPower;
+        // --------------------------------------------------------
+
         // Removed: ResourceManager.Instance.SpendResources(Owner, Cost);
         // Resources are now spent only in SpawnUnitServerRpc before this is called
 
         // Sync NetVars
-        maxHP.Value = MaxHP;
-        currentHP.Value = GetInitialHP();
+        // --- CHANGED: Instead of directly using MaxHP as "getInitialHP",
+        //              we'll keep your existing GetInitialHP() for continuity 
+        maxHP.Value = MaxHP;               // Start with base Max HP
+        currentHP.Value = GetInitialHP();       // e.g. 10 for Tanks, 6 for Jeeps, 3 for Soldiers
         attackPower.Value = GetInitialAttackPower();
 
         // Occupant references
@@ -90,16 +108,13 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         // Re-parent under "Units"
         RequestParentServerRpc("Units");
 
-        // **Don't** set transform.position on the server => let the client side do that via MoveUnitServerRpc / MoveUnitClientRpc
-
         // Visual color
         UpdateUnitVisualsClientRpc(Owner == Player.Player1 ? Color.yellow : Color.cyan,
                                    Owner == Player.Player2);
 
         Debug.Log($"[Server] Finalizing unit spawn at {gridPosition.Value}");
 
-        // OPTIONAL: If you want to place it visually right away for everyone, call MoveUnitServerRpc with force.
-        // This is just to drop it at the correct spot initially:
+        // OPTIONAL: place it visually right away with forced move
         MoveUnitServerRpc(pos, true);
     }
 
@@ -120,13 +135,19 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         {
             currentHP.Value = GetInitialHP();
             attackPower.Value = GetInitialAttackPower();
+            // --- NEW: maxHP is already set; we might force it again if you want:
+            // maxHP.Value    = MaxHP; (already set in InitializeServerRpc)
         }
+
         if (IsClient)
         {
             // Subscribe to changes
             gridPosition.OnValueChanged += OnGridPositionChanged;
             currentHP.OnValueChanged += OnHPChanged;
             attackPower.OnValueChanged += OnAttackPowerChanged;
+
+            // --- NEW: Also track changes to maxHP if you want to reflect it in UI
+            maxHP.OnValueChanged += OnMaxHPChanged;
         }
 
         UpdateUI();
@@ -141,6 +162,9 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             gridPosition.OnValueChanged -= OnGridPositionChanged;
             currentHP.OnValueChanged -= OnHPChanged;
             attackPower.OnValueChanged -= OnAttackPowerChanged;
+
+            // --- NEW: unhook from maxHP changes
+            maxHP.OnValueChanged -= OnMaxHPChanged;
         }
     }
 
@@ -149,12 +173,18 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     // ---------------------------------------
     private void UpdateUI()
     {
+        // If you have 0 maxHP in netvar, skip to avoid dividing by zero
         if (hpSlider && maxHP.Value > 0)
+        {
             hpSlider.value = (float)currentHP.Value / maxHP.Value;
+        }
 
         if (attackPowerText)
+        {
             attackPowerText.text = attackPower.Value.ToString();
+        }
     }
+
     private void OnHPChanged(int oldHP, int newHP)
     {
         Debug.Log($"[Client] Unit {unitID} HP changed {oldHP} -> {newHP}");
@@ -164,6 +194,14 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     {
         Debug.Log($"[Client] Unit {unitID} Attack changed {oldAP} -> {newAP}");
         AttackPower = newAP;
+        UpdateUI();
+    }
+
+    // --- NEW: track changes to maxHP (similar to Attack)
+    private void OnMaxHPChanged(int oldVal, int newVal)
+    {
+        Debug.Log($"[Client] Unit {unitID} maxHP changed {oldVal} -> {newVal}");
+        MaxHP = newVal;    // store the new max in your local property
         UpdateUI();
     }
 
@@ -235,6 +273,10 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         // Occupy new cell
         gridPosition.Value = newPosition;
         targetCell?.SetOccupyingUnit(this);
+
+        // --- NEW: After occupying the new cell, apply permanent bonus if any
+        ApplyTerrainBonusServerRpc();
+        // --------------------------------
 
         // Animate on clients (including Host)
         var finalPos = GridManager.Instance.GetWorldPosition(newPosition.x, newPosition.y);
@@ -312,6 +354,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
 
     private int CalculateDamage(NetworkUnit defender)
     {
+        // We use the netvar "attackPower.Value" as the damage
         return attackPower.Value;
     }
 
@@ -355,5 +398,90 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     {
         Debug.Log($"[Client] gridPosition changed from {oldPos} to {newPos}");
         // We do NOT forcibly set transform here, because we let MoveUnitClientRpc handle the movement.
+    }
+
+    // --------------------------------------------------------------------
+    // --- NEW SECTION: PERMANENT, STACKABLE TERRAIN BONUSES
+    // --------------------------------------------------------------------
+    /// <summary>
+    ///  Called each time we land on a new cell. If that cell has 
+    ///  AttackBonus, DefenseBonus, Healing, or ResourceGen, 
+    ///  we apply it permanently (or one-time if healing).
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ApplyTerrainBonusServerRpc()
+    {
+        var cell = GridManager.Instance.GetCell(gridPosition.Value.x, gridPosition.Value.y);
+        if (cell == null) return;
+
+        switch (cell.Terrain)
+        {
+            case TerrainType.DefenseBonus:
+                // +1 defense stack => we’ll handle the logic in RecalcStats
+                defenseStacks.Value++;
+                RecalculateStats();
+                TriggerBonusVFXClientRpc(TerrainType.DefenseBonus);
+                break;
+
+            case TerrainType.AttackBonus:
+                attackStacks.Value++;
+                RecalculateStats();
+                TriggerBonusVFXClientRpc(TerrainType.AttackBonus);
+                break;
+
+            case TerrainType.Healing:
+                // e.g. heal +3 each time
+                int healing = 3;
+                int newHP = currentHP.Value + healing;
+                if (newHP > maxHP.Value) newHP = maxHP.Value;
+                currentHP.Value = newHP;
+                TriggerBonusVFXClientRpc(TerrainType.Healing);
+                break;
+
+            case TerrainType.ResourceGen:
+                // e.g. +2 resources to the unit’s owner
+                ResourceManager.Instance.AddResourcesServerRpc(Owner, 2);
+                TriggerBonusVFXClientRpc(TerrainType.ResourceGen);
+                break;
+
+            default:
+                // Normal => no effect
+                break;
+        }
+    }
+
+    /// <summary>
+    ///  Recompute final MaxHP & AttackPower based on how many 
+    ///  defenseStacks / attackStacks we’ve accumulated.
+    ///  Then clamp currentHP if needed.
+    /// </summary>
+    private void RecalculateStats()
+    {
+        // Example formula:
+        // Each defense stack doubles your baseMaxHP => baseMaxHP * 2^(stacks)
+        float defMultiplier = Mathf.Pow(2f, defenseStacks.Value);
+        int newMaxHP = Mathf.RoundToInt(baseMaxHP * defMultiplier);
+
+        // Each attack stack => +4 to baseAttackPower
+        int newAttack = baseAttackPower + (attackStacks.Value * 4);
+
+        maxHP.Value = newMaxHP;
+        attackPower.Value = newAttack;
+
+        // If our current HP is now above new max, clamp it
+        if (currentHP.Value > newMaxHP)
+        {
+            currentHP.Value = newMaxHP;
+        }
+    }
+
+    // --------------------------------------------------------------------
+    // --- NEW: Just for visual feedback when you trigger a tile bonus
+    // --------------------------------------------------------------------
+    [ClientRpc]
+    private void TriggerBonusVFXClientRpc(TerrainType terrain)
+    {
+        Debug.Log($"[Client] Bonus triggered: {terrain} on unit {unitID}");
+        // Optionally, spawn a particle effect or do animation
     }
 }
