@@ -45,7 +45,6 @@ public class NetworkGameManager : NetworkBehaviour
             Debug.Log("Player 2 has joined. Removing waiting message from host.");
         }
     }
-
     [ServerRpc(RequireOwnership = false)]
     public void SpawnUnitServerRpc(UnitType type, Vector2Int position, ulong ownerClientId)
     {
@@ -79,35 +78,26 @@ public class NetworkGameManager : NetworkBehaviour
 
         if (isPlayer1 && !(col >= 0 && col <= 2))
         {
-            Debug.LogError("Player 1 can only spawn in first and third columns");
+            Debug.LogError("Player 1 can only spawn in first three columns");
             return;
         }
         else if (!isPlayer1 && !(col >= GridManager.Instance.columns - 3 && col < GridManager.Instance.columns))
         {
-            Debug.LogError("Player 2 can only spawn in last and third-to-last columns");
+            Debug.LogError("Player 2 can only spawn in last three columns");
             return;
         }
 
-        // Check resources before spawning
-        int cost = NetworkUnit.GetCost(type); // Helper method to get cost
-        Player owner = isPlayer1 ? Player.Player1 : Player.Player2;
-        if (!ResourceManager.Instance.SpendResources(owner, cost))
-        {
-            Debug.LogError($"Player {ownerClientId} has insufficient resources ({ResourceManager.Instance.GetResources(owner)} < {cost})");
-            return; // Abort if resources are insufficient
-        }
-        //// Helper method to get unit cost
-        //int GetUnitCost(UnitType type)
-        //{
-        //    switch (type)
-        //    {
-        //        case UnitType.Tank: return 4;
-        //        case UnitType.Jeep: return 2;
-        //        case UnitType.Soldier: return 1;
-        //        default: return 0; // Shouldn’t happen due to earlier validation
-        //    }
-        //}
+        // Adjust resource cost based on column
+        int additionalCost = AdjustedColumnCost(col, isPlayer1); // New!
+        int baseCost = NetworkUnit.GetCost(type);
+        int totalCost = baseCost + additionalCost;
 
+        Player owner = isPlayer1 ? Player.Player1 : Player.Player2;
+        if (!ResourceManager.Instance.SpendResources(owner, totalCost))
+        {
+            Debug.LogError($"Player {ownerClientId} has insufficient resources ({ResourceManager.Instance.GetResources(owner)} < {totalCost})");
+            return;
+        }
 
         // Spawn the unit
         GameObject unit = Instantiate(unitPrefab);
@@ -120,6 +110,26 @@ public class NetworkGameManager : NetworkBehaviour
         networkUnit.gridPosition.Value = position; // Ensure position syncs
         networkUnit.InitializeServerRpc(type, position, ownerClientId);
     }
+
+    // New! Helper method for additional column cost
+    private int AdjustedColumnCost(int col, bool isPlayer1)
+    {
+        if (isPlayer1)
+        {
+            if (col == 0) return 0;
+            if (col == 1) return 1;
+            if (col == 2) return 2;
+        }
+        else
+        {
+            int maxCol = GridManager.Instance.columns - 1;
+            if (col == maxCol) return 0;
+            if (col == maxCol - 1) return 1;
+            if (col == maxCol - 2) return 2;
+        }
+        return 0; // default to 0, though logic should prevent reaching here
+    }
+
 
     // Exit the game and clean up
     public void ExitToLobby()
