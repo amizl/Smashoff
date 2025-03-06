@@ -103,6 +103,18 @@ public class TurnManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        // New! Ensure both players joined before allowing actions
+        if (NetworkManager.Singleton.ConnectedClients.Count < 2)
+        {
+            NetworkGameManager.Instance.MessageBoardTMP.gameObject.SetActive(true); // New!
+            NetworkGameManager.Instance.MessageBoardTMP.text = "Waiting for Player 2 to join before starting"; // New!
+            Debug.Log("Waiting for Player 2 to join before starting."); // New!
+            return; // New!
+        }
+        else
+        {
+            NetworkGameManager.Instance.MessageBoardTMP.gameObject.SetActive(false); // New!
+        }
         // Find all friendly units that belong to the current player.
         var friendlyUnits = FindObjectsByType<NetworkUnit>(FindObjectsSortMode.None)
                                 .Where(unit => unit.Owner == CurrentPlayer)
