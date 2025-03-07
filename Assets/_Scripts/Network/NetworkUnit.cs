@@ -430,8 +430,8 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
                 break;
 
             case TerrainType.Healing:
-                // e.g. heal +3 each time
-                int healing = 3;
+                // e.g. heal +20 each time
+                int healing = 20;
                 int newHP = currentHP.Value + healing;
                 if (newHP > maxHP.Value) newHP = maxHP.Value;
                 currentHP.Value = newHP;
