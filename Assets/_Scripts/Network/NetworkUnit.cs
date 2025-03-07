@@ -6,6 +6,13 @@ using UnityEngine.UI;
 
 public class NetworkUnit : NetworkBehaviour, INetworkSerializable
 {
+    // terrain Bonus 
+    public int attackBonus = 4;
+    public int defenseBonus = 3;
+    public int resourceBonus = 3;
+    public int healingBonus = 3;
+
+
     [SerializeField] private Slider hpSlider;
     [SerializeField] private TextMeshProUGUI attackPowerText;
     [SerializeField] private Canvas canvasTransform;
@@ -97,7 +104,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         // --- CHANGED: Instead of directly using MaxHP as "getInitialHP",
         //              we'll keep your existing GetInitialHP() for continuity 
         maxHP.Value = MaxHP;               // Start with base Max HP
-        currentHP.Value = GetInitialHP();       // e.g. 10 for Tanks, 6 for Jeeps, 3 for Soldiers
+        currentHP.Value = MaxHP;       // e.g. 10 for Tanks, 6 for Jeeps, 3 for Soldiers
         attackPower.Value = GetInitialAttackPower();
 
         // Occupant references
@@ -133,7 +140,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     {
         if (IsServer)
         {
-            currentHP.Value = GetInitialHP();
+            currentHP.Value = MaxHP;
             attackPower.Value = GetInitialAttackPower();
             // --- NEW: maxHP is already set; we might force it again if you want:
             // maxHP.Value    = MaxHP; (already set in InitializeServerRpc)
@@ -327,15 +334,24 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc(int dmg, Vector2Int attackerPos)
     {
-        currentHP.Value -= dmg;
+        // Calculate defense value: each defense stack reduces damage by defenseBonus.
+        int defenseValue = defenseStacks.Value * defenseBonus;
+        // Effective damage is reduced by defenseValue, but ensure at least 1 damage is done.
+        int mitigatedDamage = Mathf.Max(dmg - defenseValue, 1);
+
+        // Apply only the mitigated damage.
+        currentHP.Value -= mitigatedDamage;
+
+        Debug.Log($"[Server] Unit {unitID} took {mitigatedDamage} damage after mitigation (raw damage: {dmg}, defenseValue: {defenseValue}).");
+
         if (currentHP.Value > 0) return;
 
         Debug.Log($"[Server] Unit {unitID} died. Let attacker take my spot...");
 
-        // 1) Despawn this unit
+        // 1) Despawn this unit.
         NetworkObject.Despawn();
 
-        // 2) Move the attacker onto my cell
+        // 2) Move the attacker onto my cell.
         var attackerCell = GridManager.Instance.GetCell(attackerPos.x, attackerPos.y);
         if (attackerCell != null && attackerCell.IsOccupied())
         {
@@ -343,6 +359,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             attacker.MoveUnitServerRpc(gridPosition.Value, true);
         }
     }
+
 
     // ---------------------------------------
     //        UTILS & HELPERS
@@ -364,16 +381,16 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
             && Vector2Int.Distance(gridPosition.Value, newPos) == 1;
     }
 
-    private int GetInitialHP()
-    {
-        switch (Type)
-        {
-            case UnitType.Tank: return 10;
-            case UnitType.Jeep: return 6;
-            case UnitType.Soldier: return 3;
-            default: return 0;
-        }
-    }
+    //private int GetInitialHP()
+    //{
+    //    switch (Type)
+    //    {
+    //        case UnitType.Tank: return 12;
+    //        case UnitType.Jeep: return 6;
+    //        case UnitType.Soldier: return 3;
+    //        default: return 0;
+    //    }
+    //}
 
     private int GetInitialAttackPower()
     {
@@ -457,23 +474,20 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     /// </summary>
     private void RecalculateStats()
     {
-        // Example formula:
-        // Each defense stack doubles your baseMaxHP => baseMaxHP * 2^(stacks)
-        float defMultiplier = Mathf.Pow(2f, defenseStacks.Value);
-        int newMaxHP = Mathf.RoundToInt(baseMaxHP * defMultiplier);
+        // Recalculate attack power based on attack stacks.
+        int newAttack = baseAttackPower + (attackStacks.Value * attackBonus);
 
-        // Each attack stack => +4 to baseAttackPower
-        int newAttack = baseAttackPower + (attackStacks.Value * 4);
-
-        maxHP.Value = newMaxHP;
+        // Set max HP to the constant MaxHP (which was set during initialization)
+        maxHP.Value = MaxHP;
         attackPower.Value = newAttack;
 
-        // If our current HP is now above new max, clamp it
-        if (currentHP.Value > newMaxHP)
+        // Clamp current HP to not exceed the new MaxHP.
+        if (currentHP.Value > MaxHP)
         {
-            currentHP.Value = newMaxHP;
+            currentHP.Value = MaxHP;
         }
     }
+
 
     // --------------------------------------------------------------------
     // --- NEW: Just for visual feedback when you trigger a tile bonus

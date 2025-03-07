@@ -4,7 +4,6 @@ using Unity.Netcode;
 
 public class SpawnMenuUI : MonoBehaviour
 {
-    [SerializeField] private SpawnMenuUI spawnMenuUI;
     [SerializeField] private Button spawnTankButton;
     [SerializeField] private Button spawnJeepButton;
     [SerializeField] private Button spawnSoldierButton;
