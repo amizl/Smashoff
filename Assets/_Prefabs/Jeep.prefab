@@ -34,7 +34,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.0606, y: -0.3687}
+  m_AnchoredPosition: {x: 0.25, y: -0.65500003}
   m_SizeDelta: {x: 0.8506, y: 0.6337}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &194839782008015680
@@ -92,7 +92,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 0.55
+  m_fontSize: 0.35
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -130,7 +130,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0.22939295, y: 0.043067396, z: -0.19949132, w: 0.14514053}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -312,7 +312,7 @@ Transform:
   m_GameObject: {fileID: 3217954861492287929}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -0.024, y: 0, z: 0}
   m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 1
   m_Children: []
@@ -538,7 +538,7 @@ RectTransform:
   m_GameObject: {fileID: 4684515188322961872}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.8625, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2918542920558768490}
@@ -548,7 +548,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0.008275011, y: 0.05}
+  m_AnchoredPosition: {x: 0.086, y: 0.08}
   m_SizeDelta: {x: 0.014550022, y: 0.1163}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &6204496126166526016
@@ -739,7 +739,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8357818385046724166}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -760,8 +760,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2259307943
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 4120453090
+  InScenePlacedSourceGlobalObjectIdHash: 2259307943
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
@@ -786,6 +786,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
+  attackBonus: 4
+  defenseBonus: 3
+  resourceBonus: 3
+  healingBonus: 3
+  Player1color: {r: 0.93333334, g: 0.7647059, b: 0.59607846, a: 1}
+  Player2color: {r: 0.0020914965, g: 0.4433962, b: 0.21149802, a: 1}
   hpSlider: {fileID: 6204496126166526016}
   attackPowerText: {fileID: 308234894687708076}
   canvasTransform: {fileID: 8411527946692093878}

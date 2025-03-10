@@ -11,7 +11,8 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
     public int defenseBonus = 3;
     public int resourceBonus = 3;
     public int healingBonus = 3;
-
+    [SerializeField] public Color Player1color;
+    [SerializeField] public Color Player2color;
 
     [SerializeField] private Slider hpSlider;
     [SerializeField] private TextMeshProUGUI attackPowerText;
@@ -115,8 +116,8 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         // Re-parent under "Units"
         RequestParentServerRpc("Units");
 
-        // Visual color
-        UpdateUnitVisualsClientRpc(Owner == Player.Player1 ? Color.yellow : Color.cyan,
+        // Visual color  Color.yellow : Color.cyan,
+        UpdateUnitVisualsClientRpc(Owner == Player.Player1 ? Player1color : Player2color,
                                    Owner == Player.Player2);
 
         Debug.Log($"[Server] Finalizing unit spawn at {gridPosition.Value}");
@@ -124,7 +125,7 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         // OPTIONAL: place it visually right away with forced move
         MoveUnitServerRpc(pos, true);
     }
-
+    /*
     [ClientRpc]
     private void UpdateUnitVisualsClientRpc(Color unitColor, bool flipSprite)
     {
@@ -135,7 +136,20 @@ public class NetworkUnit : NetworkBehaviour, INetworkSerializable
         transform.localScale = flipSprite ? new Vector3(-1, 1, 1) : Vector3.one;
         canvasTransform.transform.localScale = flipSprite ? new Vector3(-1, 1, 1) : Vector3.one;
     }
+    */
+    [ClientRpc]
+    private void UpdateUnitVisualsClientRpc(Color unitColor, bool flipSprite)
+    {
+        SpriteRenderer sr = GetComponentInChildren<SpriteRenderer>();
+        if (sr != null)
+        {
+            sr.color = unitColor;
+            sr.flipX = flipSprite;  // Only flip the sprite
+        }
 
+        // Leave the canvas alone so text is never reversed
+        canvasTransform.transform.localScale = Vector3.one;
+    }
     public override void OnNetworkSpawn()
     {
         if (IsServer)

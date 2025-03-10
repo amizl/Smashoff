@@ -45,12 +45,13 @@ public class NetworkGameManager : NetworkBehaviour
             Debug.Log("Player 2 has joined. Removing waiting message from host.");
         }
     }
+
     [ServerRpc(RequireOwnership = false)]
     public void SpawnUnitServerRpc(UnitType type, Vector2Int position, ulong ownerClientId)
     {
         Debug.Log($"[Server] Spawning unit at {position} for Player {ownerClientId}");
 
-        // Validate unit type
+        // Validate unit type.
         if (type < 0 || type >= (UnitType)unitPrefabs.Length)
         {
             Debug.LogError($"Invalid unit type index: {type}");
@@ -64,42 +65,41 @@ public class NetworkGameManager : NetworkBehaviour
             return;
         }
 
-        // Check if cell is occupied
-        var cell = GridManager.Instance.GetCell(position.x, position.y);
-        if (cell != null && cell.IsOccupied())
+        // Retrieve the target cell.
+        Cell cell = GridManager.Instance.GetCell(position.x, position.y);
+        if (cell == null)
         {
-            Debug.LogError("Cannot spawn unit on occupied cell");
+            Debug.LogError("Target cell is null.");
             return;
         }
 
-        // Check spawn area restrictions
+        // Determine the owner based on ownerClientId.
         bool isPlayer1 = ownerClientId == 0;
+        Player owner = isPlayer1 ? Player.Player1 : Player.Player2;
+
+        // Use the x-coordinate from position.x (intended as the column).
         int col = position.x;
 
-        if (isPlayer1 && !(col >= 0 && col <= 2))
-        {
-            Debug.LogError("Player 1 can only spawn in first three columns");
-            return;
-        }
-        else if (!isPlayer1 && !(col >= GridManager.Instance.columns - 3 && col < GridManager.Instance.columns))
-        {
-            Debug.LogError("Player 2 can only spawn in last three columns");
-            return;
-        }
-
-        // Adjust resource cost based on column
+        // Adjust resource cost based on the column.
         int additionalCost = AdjustedColumnCost(col, isPlayer1); // New!
         int baseCost = NetworkUnit.GetCost(type);
         int totalCost = baseCost + additionalCost;
 
-        Player owner = isPlayer1 ? Player.Player1 : Player.Player2;
-        if (!ResourceManager.Instance.SpendResources(owner, totalCost))
+        // Validate deployment using the helper.
+        if (!DeploymentValidator.CanDeployUnit(cell, owner, totalCost))
         {
-            Debug.LogError($"Player {ownerClientId} has insufficient resources ({ResourceManager.Instance.GetResources(owner)} < {totalCost})");
+            Debug.LogError("Deployment conditions not met: either cell is occupied, out of spawn zone, or insufficient resources.");
             return;
         }
 
-        // Spawn the unit
+        // Spend resources.
+        if (!ResourceManager.Instance.SpendResources(owner, totalCost))
+        {
+            Debug.LogError($"Player {ownerClientId} has insufficient resources ({ResourceManager.Instance.GetResources(owner)} < {totalCost}).");
+            return;
+        }
+
+        // Spawn the unit.
         GameObject unit = Instantiate(unitPrefab);
         unit.transform.position = GridManager.Instance.GetWorldPosition(position.x, position.y);
 
@@ -107,11 +107,11 @@ public class NetworkGameManager : NetworkBehaviour
         networkObject.SpawnWithOwnership(ownerClientId);
 
         NetworkUnit networkUnit = unit.GetComponent<NetworkUnit>();
-        networkUnit.gridPosition.Value = position; // Ensure position syncs
+        networkUnit.gridPosition.Value = position; // Ensure position syncs.
         networkUnit.InitializeServerRpc(type, position, ownerClientId);
     }
 
-    // New! Helper method for additional column cost
+    // New! Helper method for additional column cost.
     private int AdjustedColumnCost(int col, bool isPlayer1)
     {
         if (isPlayer1)
@@ -127,7 +127,7 @@ public class NetworkGameManager : NetworkBehaviour
             if (col == maxCol - 1) return 1;
             if (col == maxCol - 2) return 2;
         }
-        return 0; // default to 0, though logic should prevent reaching here
+        return 0; // Default to 0; logic should prevent reaching here.
     }
 
 
