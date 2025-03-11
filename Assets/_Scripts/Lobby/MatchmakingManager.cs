@@ -98,6 +98,10 @@ public class MatchmakingManager : MonoBehaviour
             };
 
             currentLobby = await LobbyService.Instance.CreateLobbyAsync(lobbyName, maxPlayers, options);
+
+            // Start host as Player 1 (creator)
+            NetworkManager.Singleton.StartHost();  // <-- New!
+
             StartLobbyHeartbeat();
             return currentLobby;
         }
@@ -137,6 +141,9 @@ public class MatchmakingManager : MonoBehaviour
             };
 
             currentLobby = await LobbyService.Instance.JoinLobbyByIdAsync(lobbyId, options);
+            
+            // **NEW**: Start the Netcode client
+            NetworkManager.Singleton.StartClient();
             return currentLobby;
         }
         catch (System.Exception e)

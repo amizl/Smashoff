@@ -4,6 +4,7 @@ using TMPro;
 using System.Collections.Generic;
 using Unity.Services.Lobbies.Models;
 using Unity.Services.Authentication;
+using Unity.Netcode;
 
 public class LobbyUI : MonoBehaviour
 {
@@ -50,8 +51,21 @@ public class LobbyUI : MonoBehaviour
 
         // IMPORTANT: We do NOT call ShowMainMenu() or RefreshLobbyList() yet.
         // We'll wait for OnSignInComplete to fire after the user is really signed in.
+        startGameButton.onClick.AddListener(OnClickStartGame); // <--- New
     }
+    private void OnClickStartGame()
+    {
+        // 1) Confirm I'm the Netcode Host
+        if (!NetworkManager.Singleton.IsHost)
+        {
+            Debug.LogWarning("Only the host can start the game!");
+            return;
+        }
 
+        // 2) Load the "SmashOff" scene for ALL connected players
+        Debug.Log("Loading SmashOff scene via Netcode for all players...");
+        NetworkManager.Singleton.SceneManager.LoadScene("SmashOff", UnityEngine.SceneManagement.LoadSceneMode.Single);
+    }
     private void OnDestroy()
     {
         // Always unsubscribe from events to avoid memory leaks / null refs
@@ -107,6 +121,7 @@ public class LobbyUI : MonoBehaviour
     // ---------------------------------------------------------------------------
     private void SetupButtonListeners()
     {
+        startGameButton.onClick.AddListener(OnClickStartGame);
         createLobbyButton.onClick.AddListener(() => ShowPanel(createLobbyPanel));
         joinLobbyButton.onClick.AddListener(() => ShowPanel(joinLobbyPanel));
         refreshLobbiesButton.onClick.AddListener(RefreshLobbyList);
@@ -224,5 +239,9 @@ public class LobbyUI : MonoBehaviour
             playersString += $"- {playerName}\n";
         }
         playerListText.text = playersString;
+    }
+    public void ExitGame()
+    {
+        Application.Quit();
     }
 }

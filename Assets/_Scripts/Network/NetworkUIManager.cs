@@ -20,29 +20,51 @@ public class NetworkUIManager : NetworkBehaviour
         else
             Destroy(gameObject);
     }
-    
+    private void Start()
+    {
+        Debug.Log($"NetworkUIManager started on {NetworkManager.Singleton.LocalClientId}");
+        ShowGameUI();
+    }
+    private void OnEnable()
+    {
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnectedCallback;
+    }
+
+    private void OnDisable()
+    {
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnectedCallback;
+    }
+    private void OnClientConnectedCallback(ulong clientId)
+    {
+        Debug.Log($"Client {clientId} connected to the host!");
+    }
+
     public void ShowGameUI()
     {
+        Debug.Log("Switching to Game UI...");
+
         lobbyUI.SetActive(false);
         gameUI.SetActive(true);
         ConnectionPanelUI.SetActive(false);
-        //ToDo Ami change later to where the game start 
-        //(maybe after player 1 place the first Unit )
+
         TurnManager.Instance.StartGame();
 
-        // If I'm Player 2 (client), disable spawn buttons on load
         if (!IsServer)
         {
+            Debug.Log("Client: Setting spawn buttons inactive.");
             UpdateTurnText(false);
             spawnMenuUI.SetSpawnButtonsInteractable(false);
         }
         else
         {
+            Debug.Log("Host: Setting spawn buttons active.");
             UpdateTurnText(true);
             spawnMenuUI.SetSpawnButtonsInteractable(true);
         }
     }
-    
+
     public void UpdateResourceText(int resources)
     {
         resourceText.text = $"Resources: {resources}";
