@@ -7,10 +7,6 @@ using Unity.Services.Authentication;
 
 public class LobbyUI : MonoBehaviour
 {
-    //[Header("Players List")]
-    //[SerializeField] private Transform playersListContent;     // The ScrollView Content
-    //[SerializeField] private GameObject playerNameItemPrefab;  // Prefab with a TextMeshProUGUI
-
     [Header("Main Menu")]
     [SerializeField] private GameObject mainMenuPanel;
     [SerializeField] private Button createLobbyButton;
@@ -38,17 +34,58 @@ public class LobbyUI : MonoBehaviour
     [SerializeField] private Button startGameButton;
     [SerializeField] private Button leaveLobbyButton;
 
+    // Polling fields for refreshing the current Lobby state
     private float pollTimer;
-    private const float POLL_INTERVAL = 5f; // Adjust as needed
-    private Lobby currentLobby; // Ensure this is updated when you create/join a lobby
+    private const float POLL_INTERVAL = 5f;
+    private Lobby currentLobby;
 
+    private void Start()
+    {
+        // 1) Set up UI button listeners
+        SetupButtonListeners();
+
+        // 2) Subscribe to sign-in events from MatchmakingManager (event-based sign-in approach)
+        MatchmakingManager.Instance.OnSignInComplete += HandleSignInComplete;
+        MatchmakingManager.Instance.OnSignInFailed += HandleSignInFailed;
+
+        // IMPORTANT: We do NOT call ShowMainMenu() or RefreshLobbyList() yet.
+        // We'll wait for OnSignInComplete to fire after the user is really signed in.
+    }
+
+    private void OnDestroy()
+    {
+        // Always unsubscribe from events to avoid memory leaks / null refs
+        if (MatchmakingManager.Instance != null)
+        {
+            MatchmakingManager.Instance.OnSignInComplete -= HandleSignInComplete;
+            MatchmakingManager.Instance.OnSignInFailed -= HandleSignInFailed;
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // EVENT CALLBACKS FOR SIGN-IN
+    // ---------------------------------------------------------------------------
+    private void HandleSignInComplete()
+    {
+        // We are now definitely signed in => safe to show main menu and query lobbies
+        ShowMainMenu();
+        RefreshLobbyList();
+    }
+
+    private void HandleSignInFailed()
+    {
+        Debug.LogError("Sign in failed! Show an error UI or let the user retry.");
+        // You could display a message or show a 'Retry' button.
+    }
+
+    // ---------------------------------------------------------------------------
+    // UPDATE: Poll the current lobby for changes (optional)
+    // ---------------------------------------------------------------------------
     private async void Update()
     {
-       
-        // Only poll if we have an active lobby (and if this is the host, if needed)
+        // Only poll if we have an active lobby
         if (currentLobby != null)
         {
-           
             pollTimer += Time.deltaTime;
             if (pollTimer >= POLL_INTERVAL)
             {
@@ -57,7 +94,7 @@ public class LobbyUI : MonoBehaviour
                 var updatedLobby = await Unity.Services.Lobbies.LobbyService.Instance.GetLobbyAsync(currentLobby.Id);
                 if (updatedLobby != null)
                 {
-                    Debug.Log("is this working?");
+                    Debug.Log("Lobby poll succeeded, updating player list...");
                     currentLobby = updatedLobby;
                     UpdatePlayerList(currentLobby);
                 }
@@ -65,24 +102,9 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
-    private void Start()
-    {
-        SetupButtonListeners();
-        ShowMainMenu();
-    }
-    //public void AddPlayerName(string playerName)
-    //{
-    //    // Instantiate a new item under the playersListContent transform
-    //    GameObject newPlayerItem = Instantiate(playerNameItemPrefab, playersListContent);
-
-    //    // Grab the TextMeshProUGUI component on the newly spawned item
-    //    TextMeshProUGUI textComponent = newPlayerItem.GetComponentInChildren<TextMeshProUGUI>();
-    //    if (textComponent != null)
-    //    {
-    //        textComponent.text = playerName;
-    //    }
-    //}
-
+    // ---------------------------------------------------------------------------
+    // UI BUTTON SETUP
+    // ---------------------------------------------------------------------------
     private void SetupButtonListeners()
     {
         createLobbyButton.onClick.AddListener(() => ShowPanel(createLobbyPanel));
@@ -91,6 +113,7 @@ public class LobbyUI : MonoBehaviour
 
         confirmCreateButton.onClick.AddListener(async () =>
         {
+            // Create a lobby
             var lobby = await MatchmakingManager.Instance.CreateLobby(lobbyNameInput.text);
             if (lobby != null)
             {
@@ -100,6 +123,7 @@ public class LobbyUI : MonoBehaviour
 
         confirmJoinButton.onClick.AddListener(async () =>
         {
+            // Join a lobby by ID (or code)
             var lobby = await MatchmakingManager.Instance.JoinLobbyById(lobbyCodeInput.text);
             if (lobby != null)
             {
@@ -107,21 +131,25 @@ public class LobbyUI : MonoBehaviour
             }
         });
 
-
         backFromCreateButton.onClick.AddListener(() => ShowMainMenu());
         backFromJoinButton.onClick.AddListener(() => ShowMainMenu());
-        // **New Listener for Leave Lobby Button:**
+
+        // Hook up the "Leave Lobby" button
         leaveLobbyButton.onClick.AddListener(() => LeaveLobby());
     }
+
+    // ---------------------------------------------------------------------------
+    // LOBBY NAVIGATION
+    // ---------------------------------------------------------------------------
     private void LeaveLobby()
     {
-        //Todo Optionally, if you have any cleanup in MatchmakingManager, call it here.
-        // For example:
-        // MatchmakingManager.Instance.LeaveLobby(); // if you have such a method
+        // If you have a specific "LeaveLobby()" method in MatchmakingManager, call it here.
+        // e.g. MatchmakingManager.Instance.LeaveLobby();
 
-        // Then, simply show the main menu
+        // Return to main menu
         ShowMainMenu();
     }
+
     private void ShowPanel(GameObject panel)
     {
         mainMenuPanel.SetActive(false);
@@ -135,26 +163,34 @@ public class LobbyUI : MonoBehaviour
     private void ShowMainMenu()
     {
         ShowPanel(mainMenuPanel);
-        RefreshLobbyList();
+        // We *can* call RefreshLobbyList here if you like,
+        // but we also do it in HandleSignInComplete() so you don't need it twice.
     }
 
+    // ---------------------------------------------------------------------------
+    // LOBBY REFRESH
+    // ---------------------------------------------------------------------------
     private async void RefreshLobbyList()
     {
+        // Clear out previous items
         foreach (Transform child in lobbyListContent)
         {
             Destroy(child.gameObject);
         }
 
+        // Grab the list of lobbies from MatchmakingManager
         var lobbies = await MatchmakingManager.Instance.GetLobbiesList();
+
+        // Instantiate UI items for each lobby
         foreach (var lobby in lobbies)
         {
             var lobbyItem = Instantiate(lobbyListItemPrefab, lobbyListContent);
             var lobbyItemUI = lobbyItem.GetComponent<LobbyListItem>();
+
+            // Clicking Join => join that lobby
             lobbyItemUI.Initialize(lobby, async () =>
             {
-                //var joinedLobby = await MatchmakingManager.Instance.JoinLobbyByCode(lobby.LobbyCode);
                 var joinedLobby = await MatchmakingManager.Instance.JoinLobbyById(lobby.Id);
-
                 if (joinedLobby != null)
                 {
                     ShowLobbyRoom(joinedLobby);
@@ -163,27 +199,30 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
+    // ---------------------------------------------------------------------------
+    // SHOW LOBBY ROOM UI
+    // ---------------------------------------------------------------------------
     private void ShowLobbyRoom(Lobby lobby)
     {
-        currentLobby = lobby; // Assign the lobby so you can poll it later
+        currentLobby = lobby; // Keep track so we can poll for changes
         ShowPanel(lobbyRoomPanel);
+
         lobbyCodeText.text = $"Lobby Code: {lobby.LobbyCode}";
         UpdatePlayerList(lobby);
 
-        startGameButton.interactable = lobby.HostId == AuthenticationService.Instance.PlayerId;
+        // Enable "Start Game" button only if I'm the host
+        startGameButton.interactable = (lobby.HostId == AuthenticationService.Instance.PlayerId);
     }
 
     private void UpdatePlayerList(Lobby lobby)
     {
-        // Build a single string with each player's name on a new line
+        // Build a single string
         string playersString = "Players:\n";
         foreach (var player in lobby.Players)
         {
             string playerName = player.Data["PlayerName"].Value;
             playersString += $"- {playerName}\n";
         }
-
-        // Assign it to your TextMeshProUGUI
         playerListText.text = playersString;
     }
 }

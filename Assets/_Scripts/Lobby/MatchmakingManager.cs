@@ -6,17 +6,23 @@ using Unity.Services.Lobbies.Models;
 using UnityEngine;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System;
 
+// --------------------------------------------
+// MATCHMAKINGMANAGER (OPTION 2, EVENT-BASED)
+// --------------------------------------------
 public class MatchmakingManager : MonoBehaviour
 {
     public static MatchmakingManager Instance { get; private set; }
-    
+
+    // New! Events you can subscribe to in LobbyUI:
+    public event Action OnSignInComplete; // Fired on successful sign-in
+    public event Action OnSignInFailed;   // Fired if sign-in fails
+
     private Lobby currentLobby;
     private float heartbeatTimer;
-    private readonly float lobbyUpdateTimer;
     private const float LOBBY_HEARTBEAT_INTERVAL = 15f;
-    private const float LOBBY_UPDATE_INTERVAL = 1.5f;
-    private bool isSigningIn = false; // New!
+    private bool isSigningIn = false; // Guard to avoid double sign-in
 
     private async void Awake()
     {
@@ -24,6 +30,8 @@ public class MatchmakingManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // Initialize Unity Services and attempt sign-in once
             await InitializeUnityServices();
         }
         else
@@ -31,21 +39,23 @@ public class MatchmakingManager : MonoBehaviour
             Destroy(gameObject);
         }
     }
-    
+
     private async Task InitializeUnityServices()
     {
         await UnityServices.InitializeAsync();
+        // Sign in once at startup; success/fail triggers events
         await SignInAnonymously();
-
-        Debug.Log($"Player Id: {AuthenticationService.Instance.PlayerId}");
     }
 
-    private async Task<bool> SignInAnonymously()
+    // -------------------------------------------------------------------
+    // SIGN IN ANONYMOUSLY - Fires OnSignInComplete or OnSignInFailed
+    // -------------------------------------------------------------------
+    private async Task SignInAnonymously()
     {
         if (isSigningIn)
         {
             Debug.LogWarning("Already signing in!");
-            return false; // New!
+            return;
         }
 
         isSigningIn = true;
@@ -54,13 +64,15 @@ public class MatchmakingManager : MonoBehaviour
         {
             Debug.Log("Signing in anonymously...");
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
+
+            // If we get here => success
             Debug.Log($"Player Id: {AuthenticationService.Instance.PlayerId}");
-            return true; // Success! New!
+            OnSignInComplete?.Invoke();  // Fire success event
         }
         catch (System.Exception e)
         {
             Debug.LogError($"Authentication failed: {e.Message}");
-            return false; // Failure! New!
+            OnSignInFailed?.Invoke();    // Fire failure event
         }
         finally
         {
@@ -68,8 +80,9 @@ public class MatchmakingManager : MonoBehaviour
         }
     }
 
-
-
+    // -------------------------------------------------------------------
+    // LOBBY CREATION & JOIN
+    // -------------------------------------------------------------------
     public async Task<Lobby> CreateLobby(string lobbyName, int maxPlayers = 2)
     {
         try
@@ -80,10 +93,10 @@ public class MatchmakingManager : MonoBehaviour
                 Player = GetPlayer(),
                 Data = new Dictionary<string, DataObject>
                 {
-                    {"GameMode", new DataObject(DataObject.VisibilityOptions.Public, "Standard")}
+                    { "GameMode", new DataObject(DataObject.VisibilityOptions.Public, "Standard") }
                 }
             };
-            
+
             currentLobby = await LobbyService.Instance.CreateLobbyAsync(lobbyName, maxPlayers, options);
             StartLobbyHeartbeat();
             return currentLobby;
@@ -94,7 +107,7 @@ public class MatchmakingManager : MonoBehaviour
             return null;
         }
     }
-    
+
     public async Task<Lobby> JoinLobbyByCode(string lobbyCode)
     {
         try
@@ -103,7 +116,7 @@ public class MatchmakingManager : MonoBehaviour
             {
                 Player = GetPlayer()
             };
-            
+
             currentLobby = await LobbyService.Instance.JoinLobbyByCodeAsync(lobbyCode, options);
             return currentLobby;
         }
@@ -113,6 +126,7 @@ public class MatchmakingManager : MonoBehaviour
             return null;
         }
     }
+
     public async Task<Lobby> JoinLobbyById(string lobbyId)
     {
         try
@@ -132,20 +146,13 @@ public class MatchmakingManager : MonoBehaviour
         }
     }
 
+    // -------------------------------------------------------------------
+    // GET LOBBIES LIST - We assume you're already signed in by now!
+    // -------------------------------------------------------------------
     public async Task<List<Lobby>> GetLobbiesList()
     {
-        if (!AuthenticationService.Instance.IsSignedIn)
-        {
-            Debug.LogWarning("Not signed in! Attempting to sign in again...");
-
-            bool signInSuccess = await SignInAnonymously(); // New!
-
-            if (!signInSuccess || !AuthenticationService.Instance.IsSignedIn) // New!
-            {
-                Debug.LogError("Failed to sign in. Cannot get lobbies."); // New!
-                return new List<Lobby>(); // New!
-            }
-        }
+        // Now that we're event-based, we do NOT sign in again here.
+        // We rely on OnSignInComplete before calling this method.
 
         try
         {
@@ -153,9 +160,9 @@ public class MatchmakingManager : MonoBehaviour
             {
                 Count = 25,
                 Filters = new List<QueryFilter>
-            {
-                new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "1", QueryFilter.OpOptions.GE)
-            }
+                {
+                    new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "1", QueryFilter.OpOptions.GE)
+                }
             };
 
             QueryResponse response = await LobbyService.Instance.QueryLobbiesAsync(options);
@@ -168,20 +175,21 @@ public class MatchmakingManager : MonoBehaviour
         }
     }
 
-
-
-
+    // -------------------------------------------------------------------
+    // HELPER METHODS
+    // -------------------------------------------------------------------
     private Unity.Services.Lobbies.Models.Player GetPlayer()
     {
         return new Unity.Services.Lobbies.Models.Player
         {
             Data = new Dictionary<string, PlayerDataObject>
-        {
-            {"PlayerName", new PlayerDataObject(PlayerDataObject.VisibilityOptions.Public, $"Player_{Random.Range(0, 1000)}")}
-        }
+            {
+                { "PlayerName", new PlayerDataObject(
+                    PlayerDataObject.VisibilityOptions.Public,
+                    $"Player_{UnityEngine.Random.Range(0, 1000)}") }
+            }
         };
     }
-
 
     private async void StartLobbyHeartbeat()
     {
