@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/LobbyScene.unity
+    guid: 255f374cbf731094395ccf67a84b7d10
+  - enabled: 1
     path: Assets/Scenes/SmashOff.unity
     guid: f5cdc3da4fcfa274d9ce653364101a37
   m_configObjects:

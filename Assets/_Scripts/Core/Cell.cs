@@ -51,7 +51,7 @@ public class Cell : MonoBehaviour, IPointerClickHandler
     }
 
     public void OnPointerClick(PointerEventData eventData)
-    {
+    {//Todo Update the color of selected cells to red if a unit cannot be deployed on that cell.
         GridManager.Instance.DeselectAllCells(); // Reset all cells first
         GridManager.Instance.SetSelectedCell(Row, Col); // Select new one
         HighlightCell(true);
